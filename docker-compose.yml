@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  rclipredis:
+    image: rclipredis:latest
+    container_name: rclipredis
+    build: redis
+  rclipapi:
+    image: rclipapi:latest
+    container_name: rclipapi
+    build: api
+    environment:
+    - REDIS_HOST=rclipredis
+    - REDIS_TTL=30
+    ports:
+    - '80:80'
+
