@@ -2,7 +2,7 @@ version: '3'
 
 services:
   rclipredis:
-    image: ${ACR_REPO/rclipredis:latest
+    image: ${ACR_REPO}/rclipredis:latest
     container_name: rclipredis
     build: redis
   rclipapi:
