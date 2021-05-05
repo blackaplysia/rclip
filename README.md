@@ -56,11 +56,17 @@ $ rclip d b53dcfa1
 
 * Python requests
 
-# 4. API list.
+# 4. API
+
+## 4-1. API list
 
 * POST /message
 * GET /message/`key`
 * DELETE /message/`key`
+
+## 4-2. API documents
+
+* You can see the Swagger document in /docs at any time while the service is running.
 
 # 5. Install
 
