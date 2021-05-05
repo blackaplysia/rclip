@@ -2,9 +2,9 @@
 
 rclip is a simple message clipboard.
 
-# Client command.
+# rclip: Client command
 
-## Send a message.
+## Send a message
 
 * Subcommand `send` (or `s`) sends a message to the server and print a key which you need when you will receive it.
 * You can give rclip the message by an arguemt, file or stdin.
@@ -18,7 +18,7 @@ $ rclip s -f message.txt
 9b8bc78c
 ```
 
-## Receive the message.
+## Receive the message
 
 * Subcommand `receive` (or `r`) receives the message related to the given key.
 * Messages has the time-to-live (TTL) defined by the server.  So you cannot receive any messages after the TTL.
@@ -31,7 +31,7 @@ $ rclip r b53dcfa1
 404 Not Found
 ```
 
-## Delete the message.
+## Delete the message
 
 * Subcommand `delete` (or `d`) deletes the message related to the given key.
 * Usually there is no need to delete messages because they has the TTL.
