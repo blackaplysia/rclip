@@ -1,10 +1,10 @@
 version: '3'
-
 services:
   rclipredis:
-    image: rclipredis:latest
+    image: redis:latest
     container_name: rclipredis
-    build: redis
+    ports:
+    - '6379:6379'
   rclipapi:
     image: rclipapi:latest
     container_name: rclipapi

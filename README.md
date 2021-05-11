@@ -68,9 +68,19 @@ $ rclip d b53dcfa1
 
 * You can see the Swagger document in /docs at any time while the service is running.
 
-# 5. Install
+# 5. Local install
 
-## 5-1. Define names for azure resources
+```
+# build and run
+docker-compose up -d
+
+# test
+sh -c 'RCLIP_API=http://localhost; KEY=$(rclip s -t hello); rclip r $KEY'
+```
+
+# 6. Azure Webapp
+
+## 6-1. Define names for azure resources
 
 ```
 export AZ_APP=__YOUR_WEB_APP_NAME__
@@ -80,14 +90,14 @@ export AZ_ACR=${AZ_APP}r
 export AZ_LOC=japaneast
 ```
 
-## 5-2. Create a resource group
+## 6-2. Create a resource group
 
 ```
 az login
 az group create -n ${AZ_GROUP} -l ${AZ_LOC}
 ```
 
-## 5-3. Create a container registry in ACR
+## 6-3. Create a container registry in ACR
 
 ```
 az acr create -g ${AZ_GROUP} -n ${AZ_ACR} --sku basic --admin-enabled true
@@ -96,14 +106,13 @@ export ACR_USER=${AZ_ACR}
 export ACR_PASS=`az acr credential show -n ${AZ_ACR} -g ${AZ_GROUP} --query passwords[0].value | sed 's/"//g'`
 ```
 
-## 5-4. Build and store images in ACR
+## 6-4. Build and store images in ACR
 
 ```
 az acr build -g ${AZ_GROUP} -r ${AZ_ACR} -t ${ACR_REPO}/rclipapi:latest ./api
-az acr build -g ${AZ_GROUP} -r ${AZ_ACR} -t ${ACR_REPO}/rclipredis:latest ./redis
 ```
 
-## 5-5. Configure docker-compose.yml for ACR
+## 6-5. Configure docker-compose.yml for ACR
 
 ```
 # Replace some environment variables.
@@ -111,7 +120,7 @@ cat docker-compose-azure.yml | envsubst > tmp/docker-compose-azure.site.yml
 
 ```
 
-## 5-6. Create a web service
+## 6-6. Create a web service
 
 ```
 az appservice plan create -g ${AZ_GROUP} -n ${AZ_PLAN} -l ${AZ_LOC} --sku B1 --is-linux
@@ -121,24 +130,23 @@ az webapp config container set -g ${AZ_GROUP} -n ${AZ_APP} -r ${ACR_REPO} -u ${A
 
 * It will take a few minutes for the server to start properly.
 
-## 5-7. Test with cURL and jq
+## 6-7. Test with cURL and jq
 
 ```
-curl -X POST -d '{"message": "hello"}' https://${AZ_APP}.azurewebsites.net/message | jq .response.key
-curl -X POST -d '{"message": "hello"}' https://${AZ_APP}.azurewebsites.net/message | jq .response.key | sed 's/"//g' > ../tmp/key
-curl -v https://${AZ_APP}.azurewebsites.net/message/`cat ../tmp/key`
-curl -v https://${AZ_APP}.azurewebsites.net/message/`cat ../tmp/key` | jq .response.message
-curl -v -X DELETE https://${AZ_APP}.azurewebsites.net/message/`cat ../tmp/key`
+curl -s -v -X POST -d '{"message": "hello"}' https://${AZ_APP}.azurewebsites.net/message | jq .response.key
+curl -s -v -X POST -d '{"message": "hello"}' https://${AZ_APP}.azurewebsites.net/message | jq .response.key | sed 's/"//g' > tmp/key
+curl -s -v https://${AZ_APP}.azurewebsites.net/message/$(cat tmp/key)
+curl -s -v https://${AZ_APP}.azurewebsites.net/message/$(cat tmp/key) | jq .response.message
+curl -s -v -X DELETE https://${AZ_APP}.azurewebsites.net/message/$(cat tmp/key)
 ```
 
-## 5-8. Use rclip client tool
+## 6-8. Use rclip client tool
 
 ```
 RCLIP_API=https://${AZ_APP}.azurewebsites.net
 rclip -h
 echo hello | rclip s
-rclip s -t hello > ../tmp/key
-rclip r `cat ../tmp/key`
-rclip d `cat ../tmp/key`
-rclip r `cat ../tmp/key`
+sh -c 'KEY=$(rclip s -t hello); rclip r $KEY'
+sh -c 'KEY=$(rclip s -t hello); rclip d $KEY'
+sh -c 'KEY=$(rclip s -t hello); rclip r $KEY; rclip d $KEY; rclip r $KEY'
 ```
