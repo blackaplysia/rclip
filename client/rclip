@@ -138,18 +138,19 @@ args = parser.parse_args()
 if args.api:
     api = args.api[0]
 
+base = '/api/v1/messages/'
 method = args.subparser_name
 exit_status = 0
 if method == 'send' or method == 's':
-    url = urljoin(api, '/message/')
+    url = urljoin(api, base)
     f = args.file[0] if args.file else None
     t = args.text[0] if args.text else None
     exit_status = send(url, f, t)
 elif method == 'receive' or method == 'r':
-    url = urljoin(api, '/message/' + args.key[0])
+    url = urljoin(api, base + args.key[0])
     exit_status = receive(url)
 elif method == 'delete' or method == 'd':
-    url = urljoin(api, '/message/' + args.key[0])
+    url = urljoin(api, base + args.key[0])
     exit_status = delete(url)
 
 exit(exit_status)

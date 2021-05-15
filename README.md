@@ -60,23 +60,13 @@ $ rclip d b53dcfa1
 
 ## 4-1. API list
 
-* POST /message
-* GET /message/`key`
-* DELETE /message/`key`
+* POST /api/v1/messages
+* GET /api/v1/messages/`key`
+* DELETE /api/v1/messages/`key`
 
 ## 4-2. API documents
 
 * You can see the Swagger document in /docs at any time while the service is running.
-
-# 5. Local install
-
-```
-# build and run
-docker-compose up -d
-
-# test
-sh -c 'RCLIP_API=http://localhost; KEY=$(rclip s -t hello); rclip r $KEY'
-```
 
 # 6. Azure Webapp
 
@@ -96,14 +86,15 @@ cat docker-compose.yml | envsubst > docker-compose.site.yml
 ## 6-3. Build and test locally
 
 ```
-export DOCKER_REPO=${DOCKER_ID}/rclipapi
-export DOCKER_IMAGE=${DOCKER_REPO}:latest
+export RCLIPAPI_REPO=${DOCKER_ID}/rclipapi
+export RCLIPAPI_IMAGE=${RCLIPAPI_REPO}:latest
 
-docker build -t ${DOCKER_IMAGE} ./api
-docker push ${DOCKER_IMAGE}
+docker build -t ${RCLIPAPI_IMAGE} ./api
+docker push ${RCLIPAPI_IMAGE}
 
 # Test locally
-docker-compose -f tmp/docker-compose.site.yml up -d
+docker-compose -f docker-compose.site.yml up -d
+sh -c 'RCLIP_API=http://localhost; KEY=$(rclip s -t hello); rclip r $KEY'
 ```
 
 ## 6-4. Create a web service
@@ -128,9 +119,9 @@ az webapp config container set -g ${AZ_GROUP} -n ${APP_NAME} -r ${ACR_REPO} -u $
 ```
 curl -s -v -X POST -d '{"message": "hello"}' https://${AZ_APP}.azurewebsites.net/message | jq .response.key
 curl -s -v -X POST -d '{"message": "hello"}' https://${AZ_APP}.azurewebsites.net/message | jq .response.key | sed 's/"//g' > tmp/key
-curl -s -v https://${AZ_APP}.azurewebsites.net/message/$(cat tmp/key)
-curl -s -v https://${AZ_APP}.azurewebsites.net/message/$(cat tmp/key) | jq .response.message
-curl -s -v -X DELETE https://${AZ_APP}.azurewebsites.net/message/$(cat tmp/key)
+curl -s -v https://${AZ_APP}.azurewebsites.net/api/v1/messages/$(cat tmp/key)
+curl -s -v https://${AZ_APP}.azurewebsites.net/api/v1/messages/$(cat tmp/key) | jq .response.message
+curl -s -v -X DELETE https://${AZ_APP}.azurewebsites.net/api/v1/messages/$(cat tmp/key)
 ```
 
 ## 6-6. Use rclip client tool

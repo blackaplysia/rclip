@@ -15,7 +15,7 @@ redis = Redis(host=redis_host, port=redis_port)
 app = FastAPI(redoc_url=None, openapi_url="/api/v1/openapi.json",
               title="rclip", description="Remote clipboard")
 
-@app.post('/message')
+@app.post('/api/v1/messages')
 async def post_message(message_data: MessageModel):
         message = message_data.message
         key_src = message + ':' + str(time.time())
@@ -25,7 +25,7 @@ async def post_message(message_data: MessageModel):
         return {'request': {'message': message},
                 'response': {'key': key, 'message': message}}
 
-@app.get('/message/{key}')
+@app.get('/api/v1/messages/{key}')
 async def get_message(key: str):
         if redis.exists(key) == 0:
                 raise HTTPException(status_code=404)
@@ -33,7 +33,7 @@ async def get_message(key: str):
         return {'request': {'key': key},
                 'response': {'key': key, 'message': message}}
 
-@app.delete('/message/{key}')
+@app.delete('/api/v1/messages/{key}')
 async def delete_message(key: str):
         if redis.exists(key) == 0:
                 raise HTTPException(status_code=404)
