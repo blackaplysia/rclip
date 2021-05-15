@@ -1,5 +1,6 @@
 .env
 *.pyc
+*.site.yml
 tmp/
 __pycache__/
 

@@ -80,57 +80,50 @@ sh -c 'RCLIP_API=http://localhost; KEY=$(rclip s -t hello); rclip r $KEY'
 
 # 6. Azure Webapp
 
-## 6-1. Define names for azure resources
+## 6-1. Define site local names
 
 ```
-export AZ_APP=__YOUR_WEB_APP_NAME__
-export AZ_GROUP=${AZ_APP}g
-export AZ_PLAN=${AZ_APP}p
-export AZ_ACR=${AZ_APP}r
+export APP_NAME=__YOUR_WEB_APP_NAME__
+export DOCKER_ID=__YOUR_DOCKER_ID__
+```
+
+## 6-2. Create site local files
+
+```
+cat docker-compose.yml | envsubst > docker-compose.site.yml
+```
+
+## 6-3. Build and test locally
+
+```
+export DOCKER_REPO=${DOCKER_ID}/rclipapi
+export DOCKER_IMAGE=${DOCKER_REPO}:latest
+
+docker build -t ${DOCKER_IMAGE} ./api
+docker push ${DOCKER_IMAGE}
+
+# Test locally
+docker-compose -f tmp/docker-compose.site.yml up -d
+```
+
+## 6-4. Create a web service
+
+```
+export AZ_GROUP=${APP_NAME}g
+export AZ_PLAN=${APP_NAME}p
+export AZ_ACR=${APP_NAME}r
 export AZ_LOC=japaneast
-```
 
-## 6-2. Create a resource group
-
-```
 az login
 az group create -n ${AZ_GROUP} -l ${AZ_LOC}
-```
-
-## 6-3. Create a container registry in ACR
-
-```
-az acr create -g ${AZ_GROUP} -n ${AZ_ACR} --sku basic --admin-enabled true
-export ACR_REPO=${AZ_ACR}.azurecr.io
-export ACR_USER=${AZ_ACR}
-export ACR_PASS=`az acr credential show -n ${AZ_ACR} -g ${AZ_GROUP} --query passwords[0].value | sed 's/"//g'`
-```
-
-## 6-4. Build and store images in ACR
-
-```
-az acr build -g ${AZ_GROUP} -r ${AZ_ACR} -t ${ACR_REPO}/rclipapi:latest ./api
-```
-
-## 6-5. Configure docker-compose.yml for ACR
-
-```
-# Replace some environment variables.
-cat docker-compose-azure.yml | envsubst > tmp/docker-compose-azure.site.yml
-
-```
-
-## 6-6. Create a web service
-
-```
 az appservice plan create -g ${AZ_GROUP} -n ${AZ_PLAN} -l ${AZ_LOC} --sku B1 --is-linux
-az webapp create -g ${AZ_GROUP} -p ${AZ_PLAN} -n ${AZ_APP} --multicontainer-config-type compose --multicontainer-config-file tmp/docker-compose-azure.site.yml
-az webapp config container set -g ${AZ_GROUP} -n ${AZ_APP} -r ${ACR_REPO} -u ${ACR_USER} -p ${ACR_PASS}
+az webapp create -g ${AZ_GROUP} -p ${AZ_PLAN} -n ${APP_NAME} --multicontainer-config-type compose --multicontainer-config-file docker-compose.site.yml
+az webapp config container set -g ${AZ_GROUP} -n ${APP_NAME} -r ${ACR_REPO} -u ${ACR_USER} -p ${ACR_PASS}
 ```
 
 * It will take a few minutes for the server to start properly.
 
-## 6-7. Test with cURL and jq
+## 6-5. Test with cURL and jq
 
 ```
 curl -s -v -X POST -d '{"message": "hello"}' https://${AZ_APP}.azurewebsites.net/message | jq .response.key
@@ -140,7 +133,7 @@ curl -s -v https://${AZ_APP}.azurewebsites.net/message/$(cat tmp/key) | jq .resp
 curl -s -v -X DELETE https://${AZ_APP}.azurewebsites.net/message/$(cat tmp/key)
 ```
 
-## 6-8. Use rclip client tool
+## 6-6. Use rclip client tool
 
 ```
 RCLIP_API=https://${AZ_APP}.azurewebsites.net

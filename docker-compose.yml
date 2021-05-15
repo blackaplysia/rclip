@@ -6,7 +6,7 @@ services:
     ports:
     - '6379:6379'
   rclipapi:
-    image: rclipapi:latest
+    image: ${DOCKER_IMAGE}
     container_name: rclipapi
     build: api
     environment:
