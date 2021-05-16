@@ -109,7 +109,7 @@ docker-compose down
 kubectl apply -f app.site.yml
 
 # test
-sh -c 'KEY=$(RCLIP_API=http://localhost:30120 rclip s -t hello); RCLIP_API=http://localhost:30120 rclip r ${KEY}'
+sh -c 'RCLIP_API=http://localhost:30120; KEY=$(rclip s -t hello); rclip r ${KEY}'
 
 # clean up
 kubectl delete -f app.site.yml
