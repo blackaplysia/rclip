@@ -68,36 +68,56 @@ $ rclip d b53dcfa1
 
 * You can see the Swagger document in /docs at any time while the service is running.
 
-# 5. Azure Webapp
+# 5. Build preparation
 
 ## 5-1. Define site local names
 
 ```
 export APP_NAME=__YOUR_WEB_APP_NAME__
 export DOCKER_ID=__YOUR_DOCKER_ID__
-```
 
-## 5-2. Create site local files
-
-```
-cat docker-compose.yml | envsubst > docker-compose.site.yml
-```
-
-## 5-3. Build and test locally
-
-```
 export RCLIPAPI_REPO=${DOCKER_ID}/rclipapi
 export RCLIPAPI_IMAGE=${RCLIPAPI_REPO}:latest
-
-docker build -t ${RCLIPAPI_IMAGE} .
-docker push ${RCLIPAPI_IMAGE}
-
-# Test locally
-docker-compose -f docker-compose.site.yml up -d
-sh -c 'RCLIP_API=http://localhost; KEY=$(rclip s -t hello); rclip r $KEY'
+cat docker-compose.yml | envsubst > docker-compose.site.yml
+cat app.yml | envsubst > app.site.yml
 ```
 
-## 5-4. Create a web service
+# 5-2. Build and push rclipapi server image in your docker hub
+
+```
+docker build -t ${RCLIPAPI_IMAGE} .
+docker push ${RCLIPAPI_IMAGE}
+```
+
+# 6. Run and test on local docker-compose
+
+```
+# run
+docker-compose -f docker-compose.site.yml up -d
+
+# test
+sh -c 'RCLIP_API=http://localhost; KEY=$(rclip s -t hello); rclip r $KEY'
+
+# clean up
+docker-compose down
+```
+
+# 7. Run and test on local k8s (port=30120)
+
+```
+# run
+kubectl apply -f app.site.yml
+
+# test
+sh -c 'KEY=$(RCLIP_API=http://localhost:30120 rclip s -t hello); RCLIP_API=http://localhost:30120 rclip r ${KEY}'
+
+# clean up
+kubectl delete -f app.site.yml
+```
+
+# 8. Run and test on Azure Web App
+
+## 8-1. Create a web service
 
 ```
 export AZ_GROUP=${APP_NAME}g
@@ -108,29 +128,39 @@ export AZ_LOC=japaneast
 az login
 az group create -n ${AZ_GROUP} -l ${AZ_LOC}
 az appservice plan create -g ${AZ_GROUP} -n ${AZ_PLAN} -l ${AZ_LOC} --sku B1 --is-linux
+cat docker-compose.yml | envsubst > docker-compose.site.yml
 az webapp create -g ${AZ_GROUP} -p ${AZ_PLAN} -n ${APP_NAME} --multicontainer-config-type compose --multicontainer-config-file docker-compose.site.yml
-az webapp config container set -g ${AZ_GROUP} -n ${APP_NAME} -r ${ACR_REPO} -u ${ACR_USER} -p ${ACR_PASS}
 ```
 
-* It will take a few minutes for the server to start properly.
+* The last task (`as webapp create`) will take a few minutes for the server to start properly.
 
-## 5-5. Test with cURL and jq
-
-```
-curl -s -v -X POST -d '{"message": "hello"}' https://${AZ_APP}.azurewebsites.net/message | jq .response.key
-curl -s -v -X POST -d '{"message": "hello"}' https://${AZ_APP}.azurewebsites.net/message | jq .response.key | sed 's/"//g' > tmp/key
-curl -s -v https://${AZ_APP}.azurewebsites.net/api/v1/messages/$(cat tmp/key)
-curl -s -v https://${AZ_APP}.azurewebsites.net/api/v1/messages/$(cat tmp/key) | jq .response.message
-curl -s -v -X DELETE https://${AZ_APP}.azurewebsites.net/api/v1/messages/$(cat tmp/key)
-```
-
-## 5-6. Use rclip client tool
+## 8-2. Test with cURL and jq
 
 ```
-RCLIP_API=https://${AZ_APP}.azurewebsites.net
+curl -s -v -X POST -d '{"message": "hello"}' https://${APP_NAME}.azurewebsites.net/api/v1/messages | jq .response.key
+curl -s -v -X POST -d '{"message": "hello"}' https://${APP_NAME}.azurewebsites.net/api/v1/messages | jq .response.key | sed 's/"//g' > tmp/key
+curl -s -v https://${APP_NAME}.azurewebsites.net/api/v1/messages/$(cat tmp/key)
+curl -s -v https://${APP_NAME}.azurewebsites.net/api/v1/messages/$(cat tmp/key) | jq .response.message
+curl -s -v -X DELETE https://${APP_NAME}.azurewebsites.net/api/v1/messages/$(cat tmp/key)
+```
+
+## 8-3. Use rclip client tool
+
+```
+export RCLIP_API=https://${APP_NAME}.azurewebsites.net
 rclip -h
 echo hello | rclip s
 sh -c 'KEY=$(rclip s -t hello); rclip r $KEY'
 sh -c 'KEY=$(rclip s -t hello); rclip d $KEY'
 sh -c 'KEY=$(rclip s -t hello); rclip r $KEY; rclip d $KEY; rclip r $KEY'
 ```
+
+## 8-4. Clean up
+
+```
+az webapp delete -g ${AZ_GROUP} -n ${APP_NAME}
+az appservice plan delete -g ${AZ_GROUP} -n ${AZ_PLAN}
+az group delete -n ${AZ_GROUP}
+```
+
+
