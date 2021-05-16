@@ -68,28 +68,28 @@ $ rclip d b53dcfa1
 
 * You can see the Swagger document in /docs at any time while the service is running.
 
-# 6. Azure Webapp
+# 5. Azure Webapp
 
-## 6-1. Define site local names
+## 5-1. Define site local names
 
 ```
 export APP_NAME=__YOUR_WEB_APP_NAME__
 export DOCKER_ID=__YOUR_DOCKER_ID__
 ```
 
-## 6-2. Create site local files
+## 5-2. Create site local files
 
 ```
 cat docker-compose.yml | envsubst > docker-compose.site.yml
 ```
 
-## 6-3. Build and test locally
+## 5-3. Build and test locally
 
 ```
 export RCLIPAPI_REPO=${DOCKER_ID}/rclipapi
 export RCLIPAPI_IMAGE=${RCLIPAPI_REPO}:latest
 
-docker build -t ${RCLIPAPI_IMAGE} ./api
+docker build -t ${RCLIPAPI_IMAGE} .
 docker push ${RCLIPAPI_IMAGE}
 
 # Test locally
@@ -97,7 +97,7 @@ docker-compose -f docker-compose.site.yml up -d
 sh -c 'RCLIP_API=http://localhost; KEY=$(rclip s -t hello); rclip r $KEY'
 ```
 
-## 6-4. Create a web service
+## 5-4. Create a web service
 
 ```
 export AZ_GROUP=${APP_NAME}g
@@ -114,7 +114,7 @@ az webapp config container set -g ${AZ_GROUP} -n ${APP_NAME} -r ${ACR_REPO} -u $
 
 * It will take a few minutes for the server to start properly.
 
-## 6-5. Test with cURL and jq
+## 5-5. Test with cURL and jq
 
 ```
 curl -s -v -X POST -d '{"message": "hello"}' https://${AZ_APP}.azurewebsites.net/message | jq .response.key
@@ -124,7 +124,7 @@ curl -s -v https://${AZ_APP}.azurewebsites.net/api/v1/messages/$(cat tmp/key) | 
 curl -s -v -X DELETE https://${AZ_APP}.azurewebsites.net/api/v1/messages/$(cat tmp/key)
 ```
 
-## 6-6. Use rclip client tool
+## 5-6. Use rclip client tool
 
 ```
 RCLIP_API=https://${AZ_APP}.azurewebsites.net
