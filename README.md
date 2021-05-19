@@ -102,22 +102,9 @@ sh -c 'RCLIP_API=http://localhost; KEY=$(rclip s -t hello); rclip r $KEY'
 docker-compose down
 ```
 
-# 7. Run and test on local k8s (port=30120)
+# 7. Run and test on Azure Web App
 
-```
-# run
-kubectl apply -f app.site.yml
-
-# test
-sh -c 'RCLIP_API=http://localhost:30120; KEY=$(rclip s -t hello); rclip r ${KEY}'
-
-# clean up
-kubectl delete -f app.site.yml
-```
-
-# 8. Run and test on Azure Web App
-
-## 8-1. Create a web service
+## 7-1. Create a web service
 
 ```
 export AZ_GROUP=${APP_NAME}g
@@ -134,7 +121,7 @@ az webapp create -g ${AZ_GROUP} -p ${AZ_PLAN} -n ${APP_NAME} --multicontainer-co
 
 * The last task (`as webapp create`) will take a few minutes for the server to start properly.
 
-## 8-2. Test with cURL and jq
+## 7-2. Test with cURL and jq
 
 ```
 curl -s -v -X POST -d '{"message": "hello"}' https://${APP_NAME}.azurewebsites.net/api/v1/messages | jq .response.key
@@ -144,7 +131,7 @@ curl -s -v https://${APP_NAME}.azurewebsites.net/api/v1/messages/$(cat tmp/key) 
 curl -s -v -X DELETE https://${APP_NAME}.azurewebsites.net/api/v1/messages/$(cat tmp/key)
 ```
 
-## 8-3. Use rclip client tool
+## 7-3. Use rclip client tool
 
 ```
 export RCLIP_API=https://${APP_NAME}.azurewebsites.net
@@ -155,7 +142,7 @@ sh -c 'KEY=$(rclip s -t hello); rclip d $KEY'
 sh -c 'KEY=$(rclip s -t hello); rclip r $KEY; rclip d $KEY; rclip r $KEY'
 ```
 
-## 8-4. Clean up
+## 7-4. Clean up
 
 ```
 az webapp delete -g ${AZ_GROUP} -n ${APP_NAME}
@@ -163,4 +150,40 @@ az appservice plan delete -g ${AZ_GROUP} -n ${AZ_PLAN}
 az group delete -n ${AZ_GROUP}
 ```
 
+# 8. Run and test on local k8s (port=30120)
 
+```
+# run
+kubectl apply -f app.site.yml
+
+# test
+sh -c 'RCLIP_API=http://localhost:30120; KEY=$(rclip s -t hello); rclip r ${KEY}'
+
+# clean up
+kubectl delete -f app.site.yml
+```
+
+# 9. Run and test on Azure Kubernetes Service (AKS)
+
+Notice: https is not supported yet.
+
+```
+export AZ_CLUSTER=${APP_NAME}c
+
+# create cluster
+az aks create -g ${AZ_GROUP} -l ${AZ_LOC} -n ${AZ_CLUSTER} -c 2
+az aks get-credentials -g ${AZ_GROUP} -n ${AZ_CLUSTER}
+
+# confirm kubectl context
+kubectl config get-contexts
+kubectl get nodes
+
+# build
+kubectl apply -f app-lb.site.yml
+
+# test
+sh -c 'RCLIP_API=http://20.48.73.118; KEY=$(rclip s -t hello); rclip r ${KEY}'
+
+# clean up
+kubectl delete -f app-lb.site.yml
+```
