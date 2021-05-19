@@ -183,7 +183,7 @@ kubectl get nodes
 kubectl apply -f app-lb.site.yml
 
 # test
-sh -c 'RCLIP_API=http://20.48.73.118; KEY=$(rclip s -t hello); rclip r ${KEY}'
+sh -c 'RCLIP_API=http://<EXTERNAL IP>; KEY=$(rclip s -t hello); rclip r ${KEY}'
 
 # clean up
 kubectl delete -f app-lb.site.yml
