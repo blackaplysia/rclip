@@ -80,9 +80,10 @@ export RCLIPAPI_REPO=${DOCKER_ID}/rclipapi
 export RCLIPAPI_IMAGE=${RCLIPAPI_REPO}:latest
 cat docker-compose.yml | envsubst > docker-compose.site.yml
 cat app.yml | envsubst > app.site.yml
+cat app-lb.yml | envsubst > app-lb.site.yml
 ```
 
-# 5-2. Build and push rclipapi server image in your docker hub
+## 5-2. Build and push rclipapi server image in your docker hub
 
 ```
 docker build -t ${RCLIPAPI_IMAGE} .
