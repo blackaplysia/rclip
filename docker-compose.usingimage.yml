@@ -4,13 +4,11 @@ services:
     image: redis:latest
     container_name: rclipredis
   rclipapi:
+    image: ${RCLIPAPI_IMAGE}
     container_name: rclipapi
-    build:
-        context: .
-        dockerfile: Dockerfile
+    build: .
     environment:
     - REDIS_HOST=rclipredis
     - REDIS_TTL=30
     ports:
     - '80:80'
-

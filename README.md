@@ -74,38 +74,107 @@ $ rclip d b53dcfa1
 
 ```
 export APP_NAME=__YOUR_WEB_APP_NAME__
+```
+
+# 6. Run and test on Azure VM (HTTP only)
+
+## 6-1. Create a VM
+
+```
+export AZ_GROUP=${APP_NAME}g
+export AZ_LOC=japaneast
+az group create -g ${AZ_GROUP} -l ${AZ_LOC}
+
+export AZ_VM_AP=ap
+az vm create -g ${AZ_GROUP} -n ${AZ_VM_AP} --image ubuntults --public-ip-address-dns-name ${APP_NAME} --ssh-key-values @~/.ssh/id.pub
+export API_SERVER=${APP_NAME}.japaneast.cloudapp.azure.com
+ssh -i ~/.ssh/id ${API_SERVER}
+```
+
+## 6-2. Build on VM
+
+```
+# Install docker and docker-compose
+sudo apt update; sudo apt upgrade -y
+sudo apt install docker.io -y
+docker --version
+
+sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+docker-compose --version
+
+# build and run
+git clone https://github.com/blackaplysia/rclip.git
+cd rclip
+docker-compose -f docker-compose.yml up -d
+```
+
+## 6-3. Test on VM
+
+```
+# Test: Server reponse
+curl -s -v http://localhost/api/v1/messages # reponse: {"detail":"Method Not Allowed"}
+
+# Test: Send a message
+curl -s -v -X POST -H 'Content-Type: application/json' -d '{"message": "hello"}' http://localhost/api/v1/messages
+
+# Send, receive and delete message
+KEY=$(curl -s -v -X POST -H 'Content-Type: application/json' -d '{"message": "hello"}' http://localhost/api/v1/messages | jq .response.key | sed 's/"//g')
+curl -s -v http://localhost/api/v1/messages/${KEY} | jq .response.message
+curl -s -v -X DELETE http://localhost/api/v1/messages/${KEY}
+```
+
+# 6-4. Use rclip client tool on VM
+
+```
+sh -c 'RCLIP_API=http://localhost; KEY=$(client/rclip s -t hello); client/rclip r $KEY'
+```
+
+# 6-5. Open port
+
+```
+az vm open-port -g ${AZ_GROUP} -n ${AZ_VM_AP} --port 80
+```
+
+# 6-6. Test from internet
+
+```
+export API_URIBASE=http://${API_SERVER}/api/v1/messages
+KEY=$(curl -s -v -X POST -H 'Content-Type: application/json' -d '{"message": "hello"}' ${API_URIBASE} | jq .response.key | sed 's/"//g')
+curl -s -v ${API_URIBASE}/${KEY} | jq .response.message
+curl -s -v -X DELETE ${API_URIBASE}/${KEY}
+```
+
+# 6-7. Use rclip client tool from internet
+
+```
+sh -c 'RCLIP_API=${API_URIBASE}; KEY=$(rclip s -t hello); rclip r $KEY'
+```
+
+# 6-8. Clean up
+
+```
+az group delete -n ${AZ_GROUP}
+```
+
+# 7. Run and test on Azure Web App, using Docker Hub
+
+## 7-1. Build and push rclipapi server image in your docker hub
+
+```
 export DOCKER_ID=__YOUR_DOCKER_ID__
 
 export RCLIPAPI_REPO=${DOCKER_ID}/rclipapi
 export RCLIPAPI_IMAGE=${RCLIPAPI_REPO}:latest
-cat docker-compose.yml | envsubst > docker-compose.site.yml
+cat docker-compose.usingimage.yml | envsubst > docker-compose.site.yml
 cat app.yml | envsubst > app.site.yml
 cat app-lb.yml | envsubst > app-lb.site.yml
-```
 
-## 5-2. Build and push rclipapi server image in your docker hub
-
-```
 docker build -t ${RCLIPAPI_IMAGE} .
 docker push ${RCLIPAPI_IMAGE}
 ```
 
-# 6. Run and test on local docker-compose
-
-```
-# run
-docker-compose -f docker-compose.site.yml up -d
-
-# test
-sh -c 'RCLIP_API=http://localhost; KEY=$(rclip s -t hello); rclip r $KEY'
-
-# clean up
-docker-compose down
-```
-
-# 7. Run and test on Azure Web App
-
-## 7-1. Create a web service
+## 7-2. Create a web service
 
 ```
 export AZ_GROUP=${APP_NAME}g
@@ -116,23 +185,23 @@ export AZ_LOC=japaneast
 az login
 az group create -n ${AZ_GROUP} -l ${AZ_LOC}
 az appservice plan create -g ${AZ_GROUP} -n ${AZ_PLAN} -l ${AZ_LOC} --sku B1 --is-linux
-cat docker-compose.yml | envsubst > docker-compose.site.yml
+cat docker-compose.usingimage.yml | envsubst > docker-compose.site.yml
 az webapp create -g ${AZ_GROUP} -p ${AZ_PLAN} -n ${APP_NAME} --multicontainer-config-type compose --multicontainer-config-file docker-compose.site.yml
 ```
 
 * The last task (`as webapp create`) will take a few minutes for the server to start properly.
 
-## 7-2. Test with cURL and jq
+## 7-3. Test with cURL and jq
 
 ```
-curl -s -v -X POST -d '{"message": "hello"}' https://${APP_NAME}.azurewebsites.net/api/v1/messages | jq .response.key
-curl -s -v -X POST -d '{"message": "hello"}' https://${APP_NAME}.azurewebsites.net/api/v1/messages | jq .response.key | sed 's/"//g' > tmp/key
+curl -s -v -X POST -H 'Content-Type: application/json' -d '{"message": "hello"}' https://${APP_NAME}.azurewebsites.net/api/v1/messages | jq .response.key
+curl -s -v -X POST -H 'Content-Type: application/json' -d '{"message": "hello"}' https://${APP_NAME}.azurewebsites.net/api/v1/messages | jq .response.key | sed 's/"//g' > tmp/key
 curl -s -v https://${APP_NAME}.azurewebsites.net/api/v1/messages/$(cat tmp/key)
 curl -s -v https://${APP_NAME}.azurewebsites.net/api/v1/messages/$(cat tmp/key) | jq .response.message
 curl -s -v -X DELETE https://${APP_NAME}.azurewebsites.net/api/v1/messages/$(cat tmp/key)
 ```
 
-## 7-3. Use rclip client tool
+## 7-4. Use rclip client tool
 
 ```
 export RCLIP_API=https://${APP_NAME}.azurewebsites.net
@@ -143,7 +212,7 @@ sh -c 'KEY=$(rclip s -t hello); rclip d $KEY'
 sh -c 'KEY=$(rclip s -t hello); rclip r $KEY; rclip d $KEY; rclip r $KEY'
 ```
 
-## 7-4. Clean up
+## 7-5. Clean up
 
 ```
 az webapp delete -g ${AZ_GROUP} -n ${APP_NAME}
@@ -175,7 +244,7 @@ export AZ_CLUSTER=${APP_NAME}c
 az aks create -g ${AZ_GROUP} -l ${AZ_LOC} -n ${AZ_CLUSTER} -c 2
 az aks get-credentials -g ${AZ_GROUP} -n ${AZ_CLUSTER}
 
-# confirm kubectl context
+# change kubectl context
 kubectl config get-contexts
 kubectl get nodes
 
@@ -187,4 +256,6 @@ sh -c 'RCLIP_API=http://<EXTERNAL IP>; KEY=$(rclip s -t hello); rclip r ${KEY}'
 
 # clean up
 kubectl delete -f app-lb.site.yml
+kubectl config delete-context ${AZ_CLUSTER}
+az aks delete -g ${AZ_GROUP} -l ${AZ_LOC} -n ${AZ_CLUSTER}
 ```
