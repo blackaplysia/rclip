@@ -106,7 +106,7 @@ docker-compose --version
 # build and run
 git clone https://github.com/blackaplysia/rclip.git
 cd rclip
-docker-compose -f docker-compose.yml up -d
+sudo docker-compose -f docker-compose.yml up -d
 ```
 
 ## 6-3. Test on VM
@@ -119,39 +119,40 @@ curl -s -v http://localhost/api/v1/messages # reponse: {"detail":"Method Not All
 curl -s -v -X POST -H 'Content-Type: application/json' -d '{"message": "hello"}' http://localhost/api/v1/messages
 
 # Send, receive and delete message
+sudo apt install jq -y
 KEY=$(curl -s -v -X POST -H 'Content-Type: application/json' -d '{"message": "hello"}' http://localhost/api/v1/messages | jq .response.key | sed 's/"//g')
 curl -s -v http://localhost/api/v1/messages/${KEY} | jq .response.message
 curl -s -v -X DELETE http://localhost/api/v1/messages/${KEY}
 ```
 
-# 6-4. Use rclip client tool on VM
+## 6-4. Use rclip client tool on VM
 
 ```
 sh -c 'RCLIP_API=http://localhost; KEY=$(client/rclip s -t hello); client/rclip r $KEY'
 ```
 
-# 6-5. Open port
+## 6-5. Open port
 
 ```
 az vm open-port -g ${AZ_GROUP} -n ${AZ_VM_AP} --port 80
 ```
 
-# 6-6. Test from internet
+## 6-6. Test from internet
 
 ```
-export API_URIBASE=http://${API_SERVER}/api/v1/messages
-KEY=$(curl -s -v -X POST -H 'Content-Type: application/json' -d '{"message": "hello"}' ${API_URIBASE} | jq .response.key | sed 's/"//g')
-curl -s -v ${API_URIBASE}/${KEY} | jq .response.message
-curl -s -v -X DELETE ${API_URIBASE}/${KEY}
+sudo apt install jq -y
+KEY=$(curl -s -v -X POST -H 'Content-Type: application/json' -d '{"message": "hello"}' http://${API_SERVER}/api/v1/messages | jq .response.key | sed 's/"//g')
+curl -s -v http://${API_SERVER}/api/v1/messages/${KEY} | jq .response.message
+curl -s -v -X DELETE http://${API_SERVER}/api/v1/messages/${KEY}
 ```
 
-# 6-7. Use rclip client tool from internet
+## 6-7. Use rclip client tool from internet
 
 ```
-sh -c 'RCLIP_API=${API_URIBASE}; KEY=$(rclip s -t hello); rclip r $KEY'
+sh -c 'export RCLIP_API=http://${API_SERVER}; KEY=$(rclip s -t hello); rclip r $KEY'
 ```
 
-# 6-8. Clean up
+## 6-8. Clean up
 
 ```
 az group delete -n ${AZ_GROUP}
