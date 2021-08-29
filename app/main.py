@@ -2,7 +2,7 @@ import hashlib
 import os
 import time
 from redis import Redis
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request, HTTPException
 
 from models import MessageModel
 
@@ -14,6 +14,11 @@ redis = Redis(host=redis_host, port=redis_port)
 
 app = FastAPI(redoc_url=None, openapi_url="/api/v1/openapi.json",
               title="rclip", description="Remote clipboard")
+
+@app.get('/ping')
+async def get_message(request: Request):
+        return {'request': 'ping',
+                'response': 'pong'}
 
 @app.post('/api/v1/messages')
 async def post_message(message_data: MessageModel):
