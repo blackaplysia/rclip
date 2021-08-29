@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import hashlib
 import os
 import time
@@ -17,31 +19,31 @@ app = FastAPI(redoc_url=None, openapi_url="/api/v1/openapi.json",
 
 @app.get('/ping')
 async def get_message(request: Request):
-        return {'request': 'ping',
-                'response': 'pong'}
+    return {'request': 'ping',
+            'response': 'pong'}
 
 @app.post('/api/v1/messages')
 async def post_message(message_data: MessageModel):
-        message = message_data.message
-        key_src = message + ':' + str(time.time())
-        key = hashlib.blake2s(key_src.encode(), digest_size=4).hexdigest()
-        redis.set(key, message)
-        redis.expire(key, redis_ttl)
-        return {'request': {'message': message},
-                'response': {'key': key, 'message': message}}
+    message = message_data.message
+    key_src = message + ':' + str(time.time())
+    key = hashlib.blake2s(key_src.encode(), digest_size=4).hexdigest()
+    redis.set(key, message)
+    redis.expire(key, redis_ttl)
+    return {'request': {'message': message},
+            'response': {'key': key, 'message': message}}
 
 @app.get('/api/v1/messages/{key}')
 async def get_message(key: str):
-        if redis.exists(key) == 0:
-                raise HTTPException(status_code=404)
-        message = redis.get(key)
-        return {'request': {'key': key},
-                'response': {'key': key, 'message': message}}
+    if redis.exists(key) == 0:
+        raise HTTPException(status_code=404)
+    message = redis.get(key)
+    return {'request': {'key': key},
+            'response': {'key': key, 'message': message}}
 
 @app.delete('/api/v1/messages/{key}')
 async def delete_message(key: str):
-        if redis.exists(key) == 0:
-                raise HTTPException(status_code=404)
-        redis.delete(key)
-        return {'request': {'key': key},
-                'response': {'key': key}}
+    if redis.exists(key) == 0:
+        raise HTTPException(status_code=404)
+    redis.delete(key)
+    return {'request': {'key': key},
+            'response': {'key': key}}
