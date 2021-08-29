@@ -108,6 +108,77 @@ def delete(url):
 
     return 0
 
+def push(url, filename):
+    res = None
+    try:
+        fd = open(filename, 'rb')
+        files = {
+            'file': (filename, fd, 'application/octet-stream')
+        }
+        try:
+            res = requests.post(url, files=files)
+        except Exception as e:
+            print(e, file=sys.stderr)
+            return errno.ENOENT
+
+        fd.close()
+    except Exception as e:
+        print(e, file=sys.stderr)
+        return errno.ENOENT
+
+    if res is not None:
+        status = res.status_code
+        content_type = res.headers['Content-Type']
+        if content_type != 'application/json':
+            text = None
+        else:
+            text = json.loads(res.text)
+
+        if status >= 400:
+            if text is not None:
+                detail = text['detail']
+                print(f'{status} {detail}')
+            else:
+                print(f'{status} ({content_type})')
+        else:
+            key = text['response']['key']
+            print(f'{key}')
+
+    return 0
+
+def pull(url, filename):
+    res = None
+    try:
+        res = requests.get(url)
+    except Exception as e:
+        print(e, file=sys.stderr)
+        return errno.ENOENT
+
+    if res is not None:
+        status = res.status_code
+        content_type = res.headers['Content-Type']
+        if content_type != 'application/json':
+            text = None
+        else:
+            text = json.loads(res.text)
+
+        if status >= 400:
+            if text is not None:
+                detail = text['detail']
+                print(f'{status} {detail}')
+            else:
+                print(f'{status} ({content_type})')
+        else:
+            try:
+                fd = open(filename, 'wb')
+                fd.write(res.content)
+                fd.close()
+            except Exception as e:
+                print(e, file=sys.stderr)
+                return errno.ENOENT
+
+    return 0
+
 def ping(url):
     res = None
     try:
@@ -157,6 +228,11 @@ subparser_receive = subparsers.add_parser('receive', aliases=['r'], help='receiv
 subparser_receive.add_argument('key', nargs=1, help='message key')
 subparser_delete = subparsers.add_parser('delete', aliases=['d'], help='delete message')
 subparser_delete.add_argument('key', nargs=1, help='message key')
+subparser_push = subparsers.add_parser('push', help='push file')
+subparser_push.add_argument('file', nargs=1, help='source data file name')
+subparser_pull = subparsers.add_parser('pull', help='pull file')
+subparser_pull.add_argument('key', nargs=1, help='file key')
+subparser_pull.add_argument('file', nargs=1, help='destination data file name')
 
 if len(sys.argv) == 1:
     print(parser.format_usage(), file=sys.stderr)
@@ -167,21 +243,30 @@ args = parser.parse_args()
 if args.api:
     api = args.api[0]
 
-base = '/api/v1/messages/'
+base_messages = '/api/v1/messages/'
+base_files = '/api/v1/files/'
 base_ping = '/ping'
 method = args.subparser_name
 exit_status = 0
 if method == 'send' or method == 's':
-    url = urljoin(api, base)
+    url = urljoin(api, base_messages)
     f = args.file[0] if args.file else None
     t = args.text[0] if args.text else None
     exit_status = send(url, f, t)
 elif method == 'receive' or method == 'r':
-    url = urljoin(api, base + args.key[0])
+    url = urljoin(api, base_messages + args.key[0])
     exit_status = receive(url)
 elif method == 'delete' or method == 'd':
-    url = urljoin(api, base + args.key[0])
+    url = urljoin(api, base_messages + args.key[0])
     exit_status = delete(url)
+elif method == 'push':
+    url = urljoin(api, base_files)
+    f = args.file[0]
+    exit_status = push(url, f)
+elif method == 'pull':
+    url = urljoin(api, base_files + args.key[0])
+    f = args.file[0]
+    exit_status = pull(url, f)
 elif method == 'ping':
     url = urljoin(api, base_ping)
     exit_status = ping(url)
