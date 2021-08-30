@@ -10,7 +10,7 @@ from argparse import RawDescriptionHelpFormatter
 from operator import attrgetter
 from urllib.parse import urljoin
 
-def send(url, filename, message):
+def send(url, filename, message, ttl):
     if message is None:
         fd = sys.stdin
         try:
@@ -26,6 +26,10 @@ def send(url, filename, message):
     data = {
         'message': message
     }
+    if ttl is not None:
+        data.update({
+            'ttl': ttl
+        })
     res = None
     try:
         res = requests.post(url, json=data)
@@ -221,6 +225,7 @@ parser.add_argument('-a', '--api', nargs=1, help='message api url')
 subparsers = parser.add_subparsers(dest='subparser_name', title='methods')
 subparser_ping = subparsers.add_parser('ping', help='ping')
 subparser_send = subparsers.add_parser('send', aliases=['s'], help='send message')
+subparser_send.add_argument('-T', '--ttl', nargs=1, help='time to live')
 subparser_send_group = subparser_send.add_mutually_exclusive_group()
 subparser_send_group.add_argument('-f', '--file', nargs=1, help='message from file (\'-\' for stdin)')
 subparser_send_group.add_argument('-t', '--text', nargs=1, help='message text')
@@ -252,7 +257,8 @@ if method == 'send' or method == 's':
     url = urljoin(api, base_messages)
     f = args.file[0] if args.file else None
     t = args.text[0] if args.text else None
-    exit_status = send(url, f, t)
+    ttl = args.ttl[0] if args.ttl else None
+    exit_status = send(url, f, t, ttl)
 elif method == 'receive' or method == 'r':
     url = urljoin(api, base_messages + args.key[0])
     exit_status = receive(url)

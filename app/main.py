@@ -25,10 +25,14 @@ async def ping(request: Request):
 @app.post('/api/v1/messages')
 async def post_message(message_data: MessageModel):
     message = message_data.message
+    if message_data.ttl is not None:
+        ttl = message_data.ttl
+    else:
+        ttl = redis_ttl
     key_src = message + ':' + str(time.time())
     key = hashlib.blake2s(key_src.encode(), digest_size=4).hexdigest()
     redis.set(key, message)
-    redis.expire(key, redis_ttl)
+    redis.expire(key, ttl)
     return {'request': {'message': message},
             'response': {'key': key, 'message': message}}
 

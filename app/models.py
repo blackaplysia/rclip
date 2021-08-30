@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 from pydantic import BaseModel
+from typing import Optional
 
 class MessageModel(BaseModel):
     message: str
+    ttl: Optional[int] = None
