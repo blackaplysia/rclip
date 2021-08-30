@@ -183,7 +183,7 @@ def pull(url, filename):
 
     return 0
 
-def ping(url):
+def ping(url, do_show_client_information):
     res = None
     try:
         res = requests.get(url)
@@ -206,8 +206,13 @@ def ping(url):
             else:
                 print(f'{status} ({content_type})')
         else:
-            pong = text['response']
-            print(f'{pong}')
+            acq = text['response']['acq']
+            if do_show_client_information:
+                host = text['response']['client']['host']
+                port = text['response']['client']['port']
+                print(f'{acq} {host} {port}')
+            else:
+                print(f'{acq}')
 
     return 0
 
@@ -224,6 +229,7 @@ You can modify this value with -a or $RCLIP_API.''')
 parser.add_argument('-a', '--api', nargs=1, help='message api url')
 subparsers = parser.add_subparsers(dest='subparser_name', title='methods')
 subparser_ping = subparsers.add_parser('ping', help='ping')
+subparser_ping.add_argument('-c', '--client', action='store_true', help='show client information')
 subparser_send = subparsers.add_parser('send', aliases=['s'], help='send message')
 subparser_send.add_argument('-T', '--ttl', nargs=1, help='time to live')
 subparser_send_group = subparser_send.add_mutually_exclusive_group()
@@ -275,6 +281,6 @@ elif method == 'pull':
     exit_status = pull(url, f)
 elif method == 'ping':
     url = urljoin(api, base_ping)
-    exit_status = ping(url)
+    exit_status = ping(url, args.client)
 
 exit(exit_status)

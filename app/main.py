@@ -20,7 +20,14 @@ app = FastAPI(redoc_url=None, openapi_url="/api/v1/openapi.json",
 @app.get('/ping')
 async def ping(request: Request):
     return {'request': 'ping',
-            'response': 'pong'}
+            'response': {
+                'acq': 'pong',
+                'client': {
+                    'host': request.client.host,
+                    'port': request.client.port
+                }
+            }
+    }
 
 @app.post('/api/v1/messages')
 async def post_message(message_data: MessageModel):
