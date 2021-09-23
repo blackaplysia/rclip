@@ -4,7 +4,7 @@ import hashlib
 import os
 import time
 from redis import Redis
-from fastapi import FastAPI, Request, Response, File, HTTPException
+from fastapi import FastAPI, Request, Response, File, UploadFile, HTTPException
 
 from models import MessageModel
 
@@ -40,6 +40,8 @@ async def post_message(message_data: MessageModel):
     key = hashlib.blake2s(key_src.encode(), digest_size=4).hexdigest()
     redis.set(key, message)
     redis.expire(key, ttl)
+    redis.hset(key+'+hash', 'key_src', key_src)
+    redis.hset(key+'+hash', 'size', len(message))
     return {'request': {'message': message},
             'response': {'key': key, 'message': message}}
 
@@ -56,16 +58,19 @@ async def delete_message(key: str):
     if redis.exists(key) == 0:
         raise HTTPException(status_code=404)
     redis.delete(key)
+    redis.delete(key+'+hash')
     return {'request': {'key': key},
             'response': {'key': key}}
 
 @app.post('/api/v1/files')
-async def post_file(file: bytes = File(...)):
-    size = len(file)
-    key_src = str(size) + ':' + str(time.time())
+async def post_file(file: UploadFile = File(...)):
+    data = file.file.read()
+    size = len(data)
+    key_src = str(file.filename) + ':' + str(time.time())
     key = hashlib.blake2s(key_src.encode(), digest_size=4).hexdigest()
-    redis.set(key, file)
-    redis.expire(key, redis_ttl)
+    redis.set(key, data)
+    redis.hset(key+'+hash', 'key_src', key_src)
+    redis.hset(key+'+hash', 'size', size)
     return {'request': {'size': size},
             'response': {'key': key, 'size': size}}
 
