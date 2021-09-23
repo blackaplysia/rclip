@@ -216,71 +216,76 @@ def ping(url, do_show_client_information):
 
     return 0
 
-class SortingHelpFormatter(RawDescriptionHelpFormatter):
-    def add_arguments(self, actions):
-        actions = sorted(actions, key=attrgetter('option_strings'))
-        super(SortingHelpFormatter, self).add_arguments(actions)
+def main():
 
-api = os.environ.get('RCLIP_API', 'http://localhost/')
+    class SortingHelpFormatter(RawDescriptionHelpFormatter):
+        def add_arguments(self, actions):
+            actions = sorted(actions, key=attrgetter('option_strings'))
+            super(SortingHelpFormatter, self).add_arguments(actions)
 
-parser = argparse.ArgumentParser(description='Remote clip', formatter_class=SortingHelpFormatter,
-                                 epilog=f'''Current message api url: {api}
+    api = os.environ.get('RCLIP_API', 'http://localhost/')
+
+    parser = argparse.ArgumentParser(description='Remote clip', formatter_class=SortingHelpFormatter,
+                                     epilog=f'''Current message api url: {api}
 You can modify this value with -a or $RCLIP_API.''')
-parser.add_argument('-a', '--api', nargs=1, help='message api url')
-subparsers = parser.add_subparsers(dest='subparser_name', title='methods')
-subparser_ping = subparsers.add_parser('ping', help='ping')
-subparser_ping.add_argument('-c', '--client', action='store_true', help='show client information')
-subparser_send = subparsers.add_parser('send', aliases=['s'], help='send message')
-subparser_send.add_argument('-T', '--ttl', nargs=1, help='time to live')
-subparser_send_group = subparser_send.add_mutually_exclusive_group()
-subparser_send_group.add_argument('-f', '--file', nargs=1, help='message from file (\'-\' for stdin)')
-subparser_send_group.add_argument('-t', '--text', nargs=1, help='message text')
-subparser_receive = subparsers.add_parser('receive', aliases=['r'], help='receive message')
-subparser_receive.add_argument('key', nargs=1, help='message key')
-subparser_delete = subparsers.add_parser('delete', aliases=['d'], help='delete message')
-subparser_delete.add_argument('key', nargs=1, help='message key')
-subparser_push = subparsers.add_parser('push', help='push file')
-subparser_push.add_argument('file', nargs=1, help='source data file name')
-subparser_pull = subparsers.add_parser('pull', help='pull file')
-subparser_pull.add_argument('key', nargs=1, help='file key')
-subparser_pull.add_argument('file', nargs=1, help='destination data file name')
+    parser.add_argument('-a', '--api', nargs=1, help='message api url')
+    subparsers = parser.add_subparsers(dest='subparser_name', title='methods')
+    subparser_ping = subparsers.add_parser('ping', help='ping')
+    subparser_ping.add_argument('-c', '--client', action='store_true', help='show client information')
+    subparser_send = subparsers.add_parser('send', aliases=['s'], help='send message')
+    subparser_send.add_argument('-T', '--ttl', nargs=1, help='time to live')
+    subparser_send_group = subparser_send.add_mutually_exclusive_group()
+    subparser_send_group.add_argument('-f', '--file', nargs=1, help='message from file (\'-\' for stdin)')
+    subparser_send_group.add_argument('-t', '--text', nargs=1, help='message text')
+    subparser_receive = subparsers.add_parser('receive', aliases=['r'], help='receive message')
+    subparser_receive.add_argument('key', nargs=1, help='message key')
+    subparser_delete = subparsers.add_parser('delete', aliases=['d'], help='delete message')
+    subparser_delete.add_argument('key', nargs=1, help='message key')
+    subparser_push = subparsers.add_parser('push', help='push file')
+    subparser_push.add_argument('file', nargs=1, help='source data file name')
+    subparser_pull = subparsers.add_parser('pull', help='pull file')
+    subparser_pull.add_argument('key', nargs=1, help='file key')
+    subparser_pull.add_argument('file', nargs=1, help='destination data file name')
 
-if len(sys.argv) == 1:
-    print(parser.format_usage(), file=sys.stderr)
-    exit(0)
+    if len(sys.argv) == 1:
+        print(parser.format_usage(), file=sys.stderr)
+        return 0
 
-args = parser.parse_args()
+    args = parser.parse_args()
 
-if args.api:
-    api = args.api[0]
+    if args.api:
+        api = args.api[0]
 
-base_messages = '/api/v1/messages/'
-base_files = '/api/v1/files/'
-base_ping = '/ping'
-method = args.subparser_name
-exit_status = 0
-if method == 'send' or method == 's':
-    url = urljoin(api, base_messages)
-    f = args.file[0] if args.file else None
-    t = args.text[0] if args.text else None
-    ttl = args.ttl[0] if args.ttl else None
-    exit_status = send(url, f, t, ttl)
-elif method == 'receive' or method == 'r':
-    url = urljoin(api, base_messages + args.key[0])
-    exit_status = receive(url)
-elif method == 'delete' or method == 'd':
-    url = urljoin(api, base_messages + args.key[0])
-    exit_status = delete(url)
-elif method == 'push':
-    url = urljoin(api, base_files)
-    f = args.file[0]
-    exit_status = push(url, f)
-elif method == 'pull':
-    url = urljoin(api, base_files + args.key[0])
-    f = args.file[0]
-    exit_status = pull(url, f)
-elif method == 'ping':
-    url = urljoin(api, base_ping)
-    exit_status = ping(url, args.client)
+    base_messages = '/api/v1/messages/'
+    base_files = '/api/v1/files/'
+    base_ping = '/ping'
+    method = args.subparser_name
+    exit_status = 0
+    if method == 'send' or method == 's':
+        url = urljoin(api, base_messages)
+        f = args.file[0] if args.file else None
+        t = args.text[0] if args.text else None
+        ttl = args.ttl[0] if args.ttl else None
+        exit_status = send(url, f, t, ttl)
+    elif method == 'receive' or method == 'r':
+        url = urljoin(api, base_messages + args.key[0])
+        exit_status = receive(url)
+    elif method == 'delete' or method == 'd':
+        url = urljoin(api, base_messages + args.key[0])
+        exit_status = delete(url)
+    elif method == 'push':
+        url = urljoin(api, base_files)
+        f = args.file[0]
+        exit_status = push(url, f)
+    elif method == 'pull':
+        url = urljoin(api, base_files + args.key[0])
+        f = args.file[0]
+        exit_status = pull(url, f)
+    elif method == 'ping':
+        url = urljoin(api, base_ping)
+        exit_status = ping(url, args.client)
 
-exit(exit_status)
+    return exit_status
+
+if __name__ == '__main__':
+    exit(main())
