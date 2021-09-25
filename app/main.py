@@ -11,6 +11,7 @@ from models import MessageModel
 redis_host = os.environ.get("REDIS_HOST", "localhost")
 redis_port = os.environ.get("REDIS_PORT", "6379")
 redis_ttl = os.environ.get("REDIS_TTL", "60")
+redis_ttl_file = os.environ.get("REDIS_TTL_FILE", "1800")
 
 redis = Redis(host=redis_host, port=redis_port)
 
@@ -66,9 +67,11 @@ async def delete_message(key: str):
 async def post_file(file: UploadFile = File(...)):
     data = file.file.read()
     size = len(data)
+    ttl = redis_ttl_file
     key_src = str(file.filename) + ':' + str(time.time())
     key = hashlib.blake2s(key_src.encode(), digest_size=4).hexdigest()
     redis.set(key, data)
+    redis.expire(key, ttl)
     redis.hset(key+'+hash', 'key_src', key_src)
     redis.hset(key+'+hash', 'size', size)
     return {'request': {'size': size},
