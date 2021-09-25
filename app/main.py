@@ -71,9 +71,10 @@ async def post_file(file: UploadFile = File(...)):
     key_src = str(file.filename) + ':' + str(time.time())
     key = hashlib.blake2s(key_src.encode(), digest_size=4).hexdigest()
     redis.set(key, data)
-    redis.expire(key, ttl)
     redis.hset(key+'+hash', 'key_src', key_src)
     redis.hset(key+'+hash', 'size', size)
+    redis.expire(key, ttl)
+    redis.expire(key+'+hash', ttl)
     return {'request': {'size': size},
             'response': {'key': key, 'size': size}}
 
