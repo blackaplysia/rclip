@@ -18,7 +18,7 @@ redis = Redis(host=redis_host, port=redis_port)
 app = FastAPI(redoc_url=None, openapi_url="/api/v1/openapi.json",
               title="rclip", description="Remote clipboard")
 
-@app.get('/ping')
+@app.get('/api/v1/ping')
 async def ping(request: Request):
     return {'request': 'ping',
             'response': {

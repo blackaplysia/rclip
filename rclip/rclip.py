@@ -258,7 +258,7 @@ You can modify this value with -a or $RCLIP_API.''')
 
     base_messages = '/api/v1/messages/'
     base_files = '/api/v1/files/'
-    base_ping = '/ping'
+    base_ping = '/api/v1/ping'
     method = args.subparser_name
     exit_status = 0
     if method == 'send' or method == 's':
