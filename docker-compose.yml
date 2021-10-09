@@ -14,4 +14,7 @@ services:
     - REDIS_TTL_FILE=600
     ports:
     - '80:80'
-
+    volumes:
+      - type: bind
+        source: ./logs
+        target: /logs
