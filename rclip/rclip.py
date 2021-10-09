@@ -216,6 +216,34 @@ def ping(url, do_show_client_information):
 
     return 0
 
+def flush(url):
+    res = None
+    try:
+        res = requests.delete(url)
+    except Exception as e:
+        print(e, file=sys.stderr)
+        return errno.ENOENT
+
+    if res is not None:
+        status = res.status_code
+        content_type = res.headers['Content-Type']
+        if content_type != 'application/json':
+            text = None
+        else:
+            text = json.loads(res.text)
+
+        if status >= 400:
+            if text is not None:
+                detail = text['detail']
+                print(f'{status} {detail}')
+            else:
+                print(f'{status} ({content_type})')
+        else:
+            result = text['response']['result']
+            print(f'{status} {result}')
+
+    return 0
+
 def main():
 
     class SortingHelpFormatter(RawDescriptionHelpFormatter):
@@ -230,8 +258,9 @@ def main():
 You can modify this value with -a or $RCLIP_API.''')
     parser.add_argument('-a', '--api', nargs=1, help='message api url')
     subparsers = parser.add_subparsers(dest='subparser_name', title='methods')
-    subparser_ping = subparsers.add_parser('ping', help='ping')
+    subparser_ping = subparsers.add_parser('ping', help='ping clipboard')
     subparser_ping.add_argument('-c', '--client', action='store_true', help='show client information')
+    subparser_flush = subparsers.add_parser('flush', help='flush clipboard')
     subparser_send = subparsers.add_parser('send', aliases=['s'], help='send message')
     subparser_send.add_argument('-T', '--ttl', nargs=1, help='time to live')
     subparser_send_group = subparser_send.add_mutually_exclusive_group()
@@ -258,7 +287,7 @@ You can modify this value with -a or $RCLIP_API.''')
 
     base_messages = '/api/v1/messages/'
     base_files = '/api/v1/files/'
-    base_ping = '/api/v1/ping'
+    base_clipboard = '/api/v1/clipboard'
     method = args.subparser_name
     exit_status = 0
     if method == 'send' or method == 's':
@@ -282,8 +311,11 @@ You can modify this value with -a or $RCLIP_API.''')
         f = args.file[0]
         exit_status = pull(url, f)
     elif method == 'ping':
-        url = urljoin(api, base_ping)
+        url = urljoin(api, base_clipboard)
         exit_status = ping(url, args.client)
+    elif method == 'flush':
+        url = urljoin(api, base_clipboard)
+        exit_status = flush(url)
 
     return exit_status
 

@@ -18,9 +18,9 @@ redis = Redis(host=redis_host, port=redis_port)
 app = FastAPI(redoc_url=None, openapi_url="/api/v1/openapi.json",
               title="rclip", description="Remote clipboard")
 
-@app.get('/api/v1/ping')
+@app.get('/api/v1/clipboard')
 async def ping(request: Request):
-    return {'request': 'ping',
+    return {'request': '(ping)',
             'response': {
                 'acq': 'pong',
                 'client': {
@@ -29,6 +29,12 @@ async def ping(request: Request):
                 }
             }
     }
+
+@app.delete('/api/v1/clipboard')
+async def delete_clippboard(request: Request):
+    result = 'OK' if redis.flushdb() == True else 'NG'
+    return {'request': '(flush)',
+            'response': {'result': result}}
 
 @app.post('/api/v1/messages')
 async def post_message(message_data: MessageModel):
