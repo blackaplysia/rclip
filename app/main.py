@@ -43,11 +43,13 @@ async def post_message(message_data: MessageModel):
         ttl = message_data.ttl
     else:
         ttl = redis_ttl
-    key_src = message + ':' + str(time.time())
+    key_time = str(time.time())
+    key_src = message + ':' + key_time
+    key_src_shadow = '*:' + key_time
     key = hashlib.blake2s(key_src.encode(), digest_size=4).hexdigest()
     redis.set(key, message)
     redis.expire(key, ttl)
-    redis.hset(key+'+hash', 'key_src', key_src)
+    redis.hset(key+'+hash', 'key_src', key_src_shadow)
     redis.hset(key+'+hash', 'size', len(message))
     return {'request': {'message': message},
             'response': {'key': key, 'message': message}}
