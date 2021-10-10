@@ -12,6 +12,9 @@ from operator import attrgetter
 from urllib.parse import urljoin
 
 def send(url, filename, message, ttl):
+    out_status = 0
+    out_message = None
+
     if message is None:
         fd = sys.stdin
         try:
@@ -21,8 +24,10 @@ def send(url, filename, message, ttl):
             if fd != sys.stdin:
                 fd.close()
         except Exception as e:
-            print(e, file=sys.stderr)
-            return errno.ENOENT
+            exception_name = type(e).__name__
+            detail = str(e)
+            out_message = f'{exception_name} {detail}'
+            return errno.EIO, out_message
 
     data = {
         'message': message
@@ -35,8 +40,10 @@ def send(url, filename, message, ttl):
     try:
         res = requests.post(url, json=data)
     except Exception as e:
-        print(e, file=sys.stderr)
-        return errno.ENOENT
+        exception_name = type(e).__name__
+        detail = str(e)
+        out_message = f'{exception_name} {detail}'
+        return errno.EIO, out_message
 
     if res is not None:
         status = res.status_code
@@ -47,26 +54,29 @@ def send(url, filename, message, ttl):
             text = json.loads(res.text)
 
         if status >= 400:
+            out_status = errno.ENOENT
             if text is not None:
                 detail = text['detail']
-                print(f'{status} {detail}')
+                out_message = f'{status} {detail}'
             else:
-                print(f'{status} ({content_type})')
+                out_message = f'{status} ({content_type})'
         else:
-            key = text['response']['key']
-            print(f'{key}')
+            out_message = text['response']['key']
 
-    return 0
+    return out_status, out_message
 
 def receive(url):
-    message = None
+    out_status = 0
+    out_message = None
 
     res = None
     try:
         res = requests.get(url)
     except Exception as e:
-        print(e, file=sys.stderr)
-        return (errno.ENOENT, None)
+        exception_name = type(e).__name__
+        detail = str(e)
+        out_message = f'{exception_name} {detail}'
+        return errno.EIO, out_message
 
     if res is not None:
         status = res.status_code
@@ -77,24 +87,29 @@ def receive(url):
             text = json.loads(res.text)
 
         if status >= 400:
+            out_status = errno.ENOENT
             if text is not None:
                 detail = text['detail']
-                print(f'{status} {detail}')
+                out_message = f'{status} {detail}'
             else:
-                print(f'{status} ({content_type})')
+                out_message = f'{status} ({content_type})'
         else:
-            message = text['response']['message']
-            print(f'{message}', end='')
+            out_message = text['response']['message']
 
-    return (0, message)
+    return out_status, out_message
 
 def delete(url):
+    out_status = 0
+    out_message = None
+
     res = None
     try:
         res = requests.delete(url)
     except Exception as e:
-        print(e, file=sys.stderr)
-        return errno.ENOENT
+        exception_name = type(e).__name__
+        detail = str(e)
+        out_message = f'{exception_name} {detail}'
+        return errno.EIO, out_message
 
     if res is not None:
         status = res.status_code
@@ -105,20 +120,23 @@ def delete(url):
             text = json.loads(res.text)
 
         if status >= 400:
+            out_status = errno.ENOENT
             if text is not None:
                 detail = text['detail']
-                print(f'{status} {detail}')
+                out_message = f'{status} {detail}'
             else:
-                print(f'{status} ({content_type})')
+                out_message = f'{status} ({content_type})'
         else:
-            print(f'{status}')
+            out_message = f'{status}'
 
-    return 0
+    return out_status, out_message
 
 def push(url, url_keys, filename, ttl, chunk_size):
-    file_size = os.path.getsize(filename)
-    keys = []
+    out_status = 0
+    part_messages = []
+
     fd = None
+    keys = []
 
     if chunk_size:
         chunk_size = int(chunk_size)
@@ -126,6 +144,7 @@ def push(url, url_keys, filename, ttl, chunk_size):
         chunk_size = 1000000
 
     try:
+        file_size = os.path.getsize(filename)
         fd = open(filename, 'rb')
         read_size = 0
         file_number = 0
@@ -138,7 +157,15 @@ def push(url, url_keys, filename, ttl, chunk_size):
                 'file': (f'{filename}.{file_number}', bd, 'application/octet-stream')
             }
 
-            res = requests.post(url, files=files)
+            res = None
+            try:
+                res = requests.post(url, files=files)
+            except Exception as e:
+                out_status = errno.EIO
+                exception_name = type(e).__name__
+                detail = str(e)
+                part_messages.append(f'#{file_number} {exception_name} {detail}')
+
             if res is not None:
                 status = res.status_code
                 content_type = res.headers['Content-Type']
@@ -148,11 +175,12 @@ def push(url, url_keys, filename, ttl, chunk_size):
                     text = json.loads(res.text)
 
                 if status >= 400:
+                    out_status = errno.NOENT
                     if text is not None:
                         detail = text['detail']
-                        print(f'{status} {detail}')
+                        part_messages.append(f'#{file_number} {status} {detail}')
                     else:
-                        print(f'{status} ({content_type})')
+                        part_messages.append(f'#{file_number} {status} ({content_type})')
                 else:
                     key = text['response']['key']
                     keys.append(key)
@@ -165,27 +193,45 @@ def push(url, url_keys, filename, ttl, chunk_size):
     except Exception as e:
         if fd is not None:
             fd.close()
-        print(e, file=sys.stderr)
-        return errno.ENOENT
+        exception_name = type(e).__name__
+        detail = str(e)
+        out_message = f'{exception_name} {detail}'
+        return errno.EIO, out_message
 
-    if len(keys) > 0:
-        return send(url_keys, None, ':'.join(keys), ttl)
+    if out_status != 0 or len(keys) == 0:
+        out_message = '\n'.join(part_messages)
+    else:
+        out_status, out_message = send(url_keys, None, ':'.join(keys), ttl)
 
-    return 0
+    return out_status, out_message
 
 def pull(url_base, url_keys, filename):
 
-    (key_status, key_list) = receive(url_keys)
+    key_status, key_list = receive(url_keys)
     if key_status != 0:
-        return key_status
+        return key_status, key_list
 
     keys = key_list.split(':')
+    if len(keys) == 0:
+        return errno.ENOENT, key_list
+
+    out_status = 0
+    out_message = filename
+    part_messages = []
 
     try:
         fd = open(filename, 'wb')
 
         for key in keys:
-            res = requests.get(url_base + key)
+            res = None
+            try:
+                res = requests.get(url_base + key)
+            except Exception as e:
+                out_status = errno.EIO
+                exception_name = type(e).__name__
+                detail = str(e)
+                part_messages.append(f'{key} {exception_name} {detail}')
+
             if res is not None:
                 status = res.status_code
                 content_type = res.headers['Content-Type']
@@ -195,28 +241,40 @@ def pull(url_base, url_keys, filename):
                     text = json.loads(res.text)
 
                 if status >= 400:
+                    out_status = errno.NOENT
                     if text is not None:
                         detail = text['detail']
-                        print(f'{status} {detail}')
+                        part_messages.append(f'{key} {status} {detail}')
                     else:
-                        print(f'{status} ({content_type})')
+                        part_messages.append(f'{key} {status} ({content_type})')
                 else:
                     fd.write(res.content)
+                    size = len(res.content)
 
         fd.close()
     except Exception as e:
-        print(e, file=sys.stderr)
-        return errno.ENOENT
+        exception_name = type(e).__name__
+        detail = str(e)
+        out_message = f'{exception_name} {detail}'
+        return errno.EIO, out_message
 
-    return 0
+    if out_status != 0:
+        out_message = '\n'.join(part_messages)
+
+    return out_status, out_message
 
 def ping(url, do_show_client_information):
+    out_status = 0
+    out_message = None
+
     res = None
     try:
         res = requests.get(url)
     except Exception as e:
-        print(e, file=sys.stderr)
-        return errno.ENOENT
+        exception_name = type(e).__name__
+        detail = str(e)
+        out_message = f'{exception_name} {detail}'
+        return errno.EIO, out_message
 
     if res is not None:
         status = res.status_code
@@ -227,29 +285,35 @@ def ping(url, do_show_client_information):
             text = json.loads(res.text)
 
         if status >= 400:
+            out_status = errno.ENOENT
             if text is not None:
                 detail = text['detail']
-                print(f'{status} {detail}')
+                out_message = f'{status} {detail}'
             else:
-                print(f'{status} ({content_type})')
+                out_message = f'{status} ({content_type})'
         else:
             acq = text['response']['acq']
             if do_show_client_information:
                 host = text['response']['client']['host']
                 port = text['response']['client']['port']
-                print(f'{acq} {host} {port}')
+                out_message = f'{acq} {host} {port}'
             else:
-                print(f'{acq}')
+                out_message = f'{acq}'
 
-    return 0
+    return out_status, out_message
 
 def flush(url):
+    out_status = 0
+    out_message = None
+
     res = None
     try:
         res = requests.delete(url)
     except Exception as e:
-        print(e, file=sys.stderr)
-        return errno.ENOENT
+        exception_name = type(e).__name__
+        detail = str(e)
+        out_message = f'{exception_name} {detail}'
+        return errno.EIO, out_message
 
     if res is not None:
         status = res.status_code
@@ -260,16 +324,17 @@ def flush(url):
             text = json.loads(res.text)
 
         if status >= 400:
+            out_status = errno.ENOENT
             if text is not None:
                 detail = text['detail']
-                print(f'{status} {detail}')
+                out_message = f'{status} {detail}'
             else:
-                print(f'{status} ({content_type})')
+                out_message = f'{status} ({content_type})'
         else:
             result = text['response']['result']
-            print(f'{status} {result}')
+            out_message = f'{status} {result}'
 
-    return 0
+    return out_status, out_message
 
 def main():
 
@@ -318,39 +383,44 @@ You can modify this value with -a or $RCLIP_API.''')
     base_files = '/api/v1/files/'
     base_clipboard = '/api/v1/clipboard'
     method = args.subparser_name
-    exit_status = 0
+    out_status = 0
     if method == 'send' or method == 's':
         url = urljoin(api, base_messages)
         f = args.file[0] if args.file else None
         t = args.text[0] if args.text else None
         ttl = args.ttl[0] if args.ttl else None
-        exit_status = send(url, f, t, ttl)
+        out_status, out_message = send(url, f, t, ttl)
     elif method == 'receive' or method == 'r':
         url = urljoin(api, base_messages + args.key[0])
-        (exit_status, message) = receive(url)
+        out_status, out_message = receive(url)
     elif method == 'delete' or method == 'd':
         url = urljoin(api, base_messages + args.key[0])
-        exit_status = delete(url)
+        out_status, out_message = delete(url)
     elif method == 'push':
         url = urljoin(api, base_files)
         url_keys = urljoin(api, base_messages)
         f = args.file[0]
         ttl = args.ttl[0] if args.ttl else None
         chunksize = args.chunksize[0] if args.chunksize else None
-        exit_status = push(url, url_keys, f, ttl, chunksize)
+        out_status, out_message = push(url, url_keys, f, ttl, chunksize)
     elif method == 'pull':
         url_base = urljoin(api, base_files)
         url_keys = urljoin(api, base_messages + args.key[0])
         f = args.file[0]
-        exit_status = pull(url_base, url_keys, f)
+        out_status, out_message = pull(url_base, url_keys, f)
     elif method == 'ping':
         url = urljoin(api, base_clipboard)
-        exit_status = ping(url, args.client)
+        out_status, out_message = ping(url, args.client)
     elif method == 'flush':
         url = urljoin(api, base_clipboard)
-        exit_status = flush(url)
+        out_status, out_message = flush(url)
 
-    return exit_status
+    if out_status != 0:
+        print(out_message, file=sys.stderr)
+    else:
+        print(out_message, end='')
+
+    return out_status
 
 if __name__ == '__main__':
     exit(main())
