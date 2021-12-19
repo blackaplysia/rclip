@@ -5,4 +5,5 @@ from typing import Optional
 
 class MessageModel(BaseModel):
     message: str
+    category: Optional[str] = None
     ttl: Optional[int] = None

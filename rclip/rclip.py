@@ -11,18 +11,18 @@ from argparse import RawDescriptionHelpFormatter
 from operator import attrgetter
 from urllib.parse import urljoin
 
-def send(url, filename, message, ttl):
+rclip_category_file_fragment_list = 'file-fragment-list'
+rclip_status_file_fragment_list = 278
+
+verbose = False
+
+def send(url, message, ttl, control_message=False):
     out_status = 0
     out_message = None
 
     if message is None:
-        fd = sys.stdin
         try:
-            if filename is not None and filename != '-':
-                fd = open(filename)
-            message = fd.read()
-            if fd != sys.stdin:
-                fd.close()
+            message = sys.stdin.read()
         except Exception as e:
             exception_name = type(e).__name__
             detail = str(e)
@@ -35,6 +35,10 @@ def send(url, filename, message, ttl):
     if ttl is not None:
         data.update({
             'ttl': ttl
+        })
+    if control_message is True:
+        data.update({
+            'category': rclip_category_file_fragment_list
         })
     res = None
     try:
@@ -62,6 +66,9 @@ def send(url, filename, message, ttl):
                 out_message = f'{status} ({content_type})'
         else:
             out_message = text['response']['key']
+
+    if verbose:
+        print(f'url: {url}, ttl: {ttl}, category: {rclip_category_file_fragment_list}', file=sys.stderr)
 
     return out_status, out_message
 
@@ -95,6 +102,12 @@ def receive(url):
                 out_message = f'{status} ({content_type})'
         else:
             out_message = text['response']['message']
+            category = text['response']['category']
+            if category == rclip_category_file_fragment_list:
+                out_status = rclip_status_file_fragment_list
+
+    if verbose:
+        print(f'url: {url}', file=sys.stderr)
 
     return out_status, out_message
 
@@ -129,13 +142,15 @@ def delete(url):
         else:
             out_message = f'{status}'
 
+    if verbose:
+        print(f'url: {url}', file=sys.stderr)
+
     return out_status, out_message
 
-def push(url, url_keys, filename, ttl, chunk_size):
+def send_file(url, url_keys, filename, ttl, chunk_size = None):
     out_status = 0
     part_messages = []
 
-    fd = None
     keys = []
 
     if chunk_size:
@@ -145,34 +160,37 @@ def push(url, url_keys, filename, ttl, chunk_size):
 
     try:
         file_size = os.path.getsize(filename)
-        fd = open(filename, 'rb')
-        read_size = 0
-        file_number = 0
-        while read_size < file_size:
-            fd.seek(read_size)
-            data = fd.read(chunk_size)
-            bd = io.BytesIO(data)
+        with open(filename, 'rb') as fd:
+            read_size = 0
+            file_number = 0
+            while read_size < file_size:
+                fd.seek(read_size)
+                data = fd.read(chunk_size)
+                sz = len(data)
+                bd = io.BytesIO(data)
 
-            files = {
-                'file': (f'{filename}.{file_number}', bd, 'application/octet-stream')
-            }
+                files = {
+                    'file': (f'{filename}.{file_number}', bd, 'application/octet-stream')
+                }
 
-            res = None
-            try:
-                res = requests.post(url, files=files)
-            except Exception as e:
-                out_status = errno.EIO
-                exception_name = type(e).__name__
-                detail = str(e)
-                part_messages.append(f'#{file_number} {exception_name} {detail}')
+                res = None
+                try:
+                    res = requests.post(url, files=files)
+                except Exception as e:
+                    out_status = errno.EIO
+                    exception_name = type(e).__name__
+                    detail = str(e)
+                    part_messages.append(f'#{file_number} {exception_name} {detail}')
+                    out_message = '\n'.join(part_messages)
+                    return out_status, out_message
 
-            if res is not None:
-                status = res.status_code
-                content_type = res.headers['Content-Type']
-                if content_type != 'application/json':
-                    text = None
-                else:
-                    text = json.loads(res.text)
+                if res is not None:
+                    status = res.status_code
+                    content_type = res.headers['Content-Type']
+                    if content_type != 'application/json':
+                        text = None
+                    else:
+                        text = json.loads(res.text)
 
                 if status >= 400:
                     out_status = errno.NOENT
@@ -185,52 +203,57 @@ def push(url, url_keys, filename, ttl, chunk_size):
                     key = text['response']['key']
                     keys.append(key)
 
-            read_size = read_size + len(data)
-            file_number = file_number + 1
+                if verbose:
+                    print(f'url: {url}, file: {filename}.{file_number}, length: {sz}', file=sys.stderr)
 
-        fd.close()
+                read_size = read_size + sz
+                file_number = file_number + 1
 
     except Exception as e:
-        if fd is not None:
-            fd.close()
         exception_name = type(e).__name__
         detail = str(e)
-        out_message = f'{exception_name} {detail}'
+        part_messages.append(f'#? {exception_name} {detail}')
+        out_message = '\n'.join(part_messages)
         return errno.EIO, out_message
 
-    if out_status != 0 or len(keys) == 0:
-        out_message = '\n'.join(part_messages)
+    key_status, key_message = send(url_keys, ':'.join(keys), ttl, control_message=True)
+    if key_status == 0:
+        out_message = key_message
     else:
-        out_status, out_message = send(url_keys, None, ':'.join(keys), ttl)
-
+        part_messages.append(f'#* {key_status} {key_message}')
+        out_message = '\n'.join(part_messages)
+        out_status = key_status
     return out_status, out_message
 
-def pull(url_base, url_keys, filename):
-
-    key_status, key_list = receive(url_keys)
-    if key_status != 0:
-        return key_status, key_list
-
-    keys = key_list.split(':')
-    if len(keys) == 0:
-        return errno.ENOENT, key_list
-
+def receive_file(url_base, filename, keys_string):
     out_status = 0
-    out_message = filename
+    out_message = None
     part_messages = []
 
+    keys = keys_string.split(':')
+
+    if filename is None:
+        fd = sys.stdout.buffer
+
     try:
-        fd = open(filename, 'wb')
+        if filename is not None:
+            fd = open(filename, 'wb')
 
         for key in keys:
+            sz = 0
             res = None
             try:
-                res = requests.get(url_base + key)
+                url = url_base + key
+                res = requests.get(url)
             except Exception as e:
+                if fd is not sys.stdout.buffer:
+                    fd.close()
                 out_status = errno.EIO
                 exception_name = type(e).__name__
                 detail = str(e)
                 part_messages.append(f'{key} {exception_name} {detail}')
+                out_message = '\n'.join(part_messages)
+                return out_status, out_message
 
             if res is not None:
                 status = res.status_code
@@ -241,7 +264,7 @@ def pull(url_base, url_keys, filename):
                     text = json.loads(res.text)
 
                 if status >= 400:
-                    out_status = errno.NOENT
+                    out_status = errno.ENOENT
                     if text is not None:
                         detail = text['detail']
                         part_messages.append(f'{key} {status} {detail}')
@@ -249,17 +272,25 @@ def pull(url_base, url_keys, filename):
                         part_messages.append(f'{key} {status} ({content_type})')
                 else:
                     fd.write(res.content)
-                    size = len(res.content)
+                    sz = len(res.content)
 
-        fd.close()
+            if verbose:
+                print(f'url: {url}, length: {sz}', file=sys.stderr)
+
+        if fd is not sys.stdout.buffer:
+            fd.close()
+            fd = sys.stdout
+
     except Exception as e:
+        if fd is not sys.stdout.buffer:
+            fd.close()
         exception_name = type(e).__name__
         detail = str(e)
-        out_message = f'{exception_name} {detail}'
+        part_messages.append(f'#? {exception_name} {detail}')
+        out_message = '\n'.join(part_messages)
         return errno.EIO, out_message
 
-    if out_status != 0:
-        out_message = '\n'.join(part_messages)
+    out_message = '\n'.join(part_messages)
 
     return out_status, out_message
 
@@ -300,6 +331,9 @@ def ping(url, do_show_client_information):
             else:
                 out_message = f'{acq}'
 
+    if verbose:
+        print(f'url: {url}', file=sys.stderr)
+
     return out_status, out_message
 
 def flush(url):
@@ -334,6 +368,9 @@ def flush(url):
             result = text['response']['result']
             out_message = f'{status} {result}'
 
+    if verbose:
+        print(f'url: {url}', file=sys.stderr)
+
     return out_status, out_message
 
 def main():
@@ -349,26 +386,22 @@ def main():
                                      epilog=f'''Current message api url: {api}
 You can modify this value with -a or $RCLIP_API.''')
     parser.add_argument('-a', '--api', nargs=1, help='message api url')
+    parser.add_argument('-v', '--verbose', action='store_true', help='verbose mode')
     subparsers = parser.add_subparsers(dest='subparser_name', title='methods')
     subparser_ping = subparsers.add_parser('ping', help='ping clipboard')
     subparser_ping.add_argument('-c', '--client', action='store_true', help='show client information')
     subparser_flush = subparsers.add_parser('flush', help='flush clipboard')
     subparser_send = subparsers.add_parser('send', aliases=['s'], help='send message')
     subparser_send.add_argument('-T', '--ttl', nargs=1, help='time to live')
+    subparser_send.add_argument('-C', '--chunksize', nargs=1, help='chunk size')
     subparser_send_group = subparser_send.add_mutually_exclusive_group()
-    subparser_send_group.add_argument('-f', '--file', nargs=1, help='message from file (\'-\' for stdin)')
+    subparser_send_group.add_argument('-f', '--file', nargs=1, help='message file (\'-\' for stdin)')
     subparser_send_group.add_argument('-t', '--text', nargs=1, help='message text')
     subparser_receive = subparsers.add_parser('receive', aliases=['r'], help='receive message')
     subparser_receive.add_argument('key', nargs=1, help='message key')
+    subparser_receive.add_argument('-o', '--output', nargs=1, help='output file')
     subparser_delete = subparsers.add_parser('delete', aliases=['d'], help='delete message')
     subparser_delete.add_argument('key', nargs=1, help='message key')
-    subparser_push = subparsers.add_parser('push', help='push file')
-    subparser_push.add_argument('file', nargs=1, help='source data file name')
-    subparser_push.add_argument('-T', '--ttl', nargs=1, help='time to live')
-    subparser_push.add_argument('-C', '--chunksize', nargs=1, help='chunk size')
-    subparser_pull = subparsers.add_parser('pull', help='pull file')
-    subparser_pull.add_argument('key', nargs=1, help='file key')
-    subparser_pull.add_argument('file', nargs=1, help='destination data file name')
 
     if len(sys.argv) == 1:
         print(parser.format_usage(), file=sys.stderr)
@@ -379,35 +412,35 @@ You can modify this value with -a or $RCLIP_API.''')
     if args.api:
         api = args.api[0]
 
+    global verbose
+    verbose = args.verbose
+
     base_messages = '/api/v1/messages/'
     base_files = '/api/v1/files/'
     base_clipboard = '/api/v1/clipboard'
     method = args.subparser_name
     out_status = 0
     if method == 'send' or method == 's':
-        url = urljoin(api, base_messages)
         f = args.file[0] if args.file else None
         t = args.text[0] if args.text else None
         ttl = args.ttl[0] if args.ttl else None
-        out_status, out_message = send(url, f, t, ttl)
+        if f:
+            file_url = urljoin(api, base_files)
+            keys_url = urljoin(api, base_messages)
+            out_status, out_message = send_file(file_url, keys_url, f, ttl)
+        else:
+            url = urljoin(api, base_messages)
+            out_status, out_message = send(url, t, ttl)
     elif method == 'receive' or method == 'r':
-        url = urljoin(api, base_messages + args.key[0])
-        out_status, out_message = receive(url)
+        o = args.output[0] if args.output else None
+        keys_url = urljoin(api, base_messages + args.key[0])
+        out_status, out_message = receive(keys_url)
+        if out_status == rclip_status_file_fragment_list:
+            base_url = urljoin(api, base_files)
+            out_status, out_message = receive_file(base_url, o, out_message)
     elif method == 'delete' or method == 'd':
         url = urljoin(api, base_messages + args.key[0])
         out_status, out_message = delete(url)
-    elif method == 'push':
-        url = urljoin(api, base_files)
-        url_keys = urljoin(api, base_messages)
-        f = args.file[0]
-        ttl = args.ttl[0] if args.ttl else None
-        chunksize = args.chunksize[0] if args.chunksize else None
-        out_status, out_message = push(url, url_keys, f, ttl, chunksize)
-    elif method == 'pull':
-        url_base = urljoin(api, base_files)
-        url_keys = urljoin(api, base_messages + args.key[0])
-        f = args.file[0]
-        out_status, out_message = pull(url_base, url_keys, f)
     elif method == 'ping':
         url = urljoin(api, base_clipboard)
         out_status, out_message = ping(url, args.client)
