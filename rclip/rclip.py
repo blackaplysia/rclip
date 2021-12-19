@@ -68,7 +68,7 @@ def send(url, message, ttl, control_message=False):
             out_message = text['response']['key']
 
     if verbose:
-        print(f'url: {url}, ttl: {ttl}, category: {rclip_category_file_fragment_list}', file=sys.stderr)
+        print(f'post url: {url}, ttl: {ttl}, category: {rclip_category_file_fragment_list}', file=sys.stderr)
 
     return out_status, out_message
 
@@ -107,7 +107,7 @@ def receive(url):
                 out_status = rclip_status_file_fragment_list
 
     if verbose:
-        print(f'url: {url}', file=sys.stderr)
+        print(f'get url: {url}', file=sys.stderr)
 
     return out_status, out_message
 
@@ -143,7 +143,7 @@ def delete(url):
             out_message = f'{status}'
 
     if verbose:
-        print(f'url: {url}', file=sys.stderr)
+        print(f'del url: {url}', file=sys.stderr)
 
     return out_status, out_message
 
@@ -204,7 +204,7 @@ def send_file(url, url_keys, filename, ttl, chunk_size = None):
                     keys.append(key)
 
                 if verbose:
-                    print(f'url: {url}, file: {filename}.{file_number}, length: {sz}', file=sys.stderr)
+                    print(f'post url: {url}, file: {filename}.{file_number}, length: {sz}', file=sys.stderr)
 
                 read_size = read_size + sz
                 file_number = file_number + 1
@@ -275,7 +275,7 @@ def receive_file(url_base, filename, keys_string):
                     sz = len(res.content)
 
             if verbose:
-                print(f'url: {url}, length: {sz}', file=sys.stderr)
+                print(f'get url: {url}, length: {sz}', file=sys.stderr)
 
         if fd is not sys.stdout.buffer:
             fd.close()
@@ -332,7 +332,7 @@ def ping(url, do_show_client_information):
                 out_message = f'{acq}'
 
     if verbose:
-        print(f'url: {url}', file=sys.stderr)
+        print(f'get url: {url}', file=sys.stderr)
 
     return out_status, out_message
 
@@ -369,7 +369,7 @@ def flush(url):
             out_message = f'{status} {result}'
 
     if verbose:
-        print(f'url: {url}', file=sys.stderr)
+        print(f'del url: {url}', file=sys.stderr)
 
     return out_status, out_message
 
