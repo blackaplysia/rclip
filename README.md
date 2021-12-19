@@ -4,9 +4,9 @@ rclip is a simple message clipboard.
 
 # 2. Usage
 
-## 2-1. Send a message
+## 2-1. Send a message or a file
 
-* Subcommand `send` (or `s`) sends a message to the server and print a key which you need when you will receive it.
+* Subcommand `send` (or `s`) sends a message or a file to the server and print a key which you need when you will receive it.
 * You can give rclip the message by an arguemt, file or stdin.
 
 ```
@@ -14,8 +14,10 @@ $ rclip s -t hello1
 f0ef6a40
 $ echo hello2 | rclip s
 b53dcfa1
-$ rclip s -f message.txt
-9b8bc78c
+$ rclip s -f srcfile
+a4d8354c
+$ rclip s -f srcfile -T 6000 # TTL 6000sec
+a4d8354c
 ```
 
 ## 2-2. Receive the message
@@ -26,6 +28,8 @@ $ rclip s -f message.txt
 ```
 $ rclip r b53dcfa1
 hello2
+$ rclip r b53dcfa1 > destfile
+$ rclip r b53dcfa1 -o destfile
 $ sleep 60
 $ rclip r b53dcfa1
 404 Not Found
@@ -41,6 +45,27 @@ $ rclip d b53dcfa1
 200
 $ rclip d b53dcfa1
 404 Not Found
+```
+
+## 2-4. Flush all messages
+
+* Subcommand `flush` flushes the message database on the server.
+* Usually there is no need to flush database because their data has the TTL.
+
+```
+$ rclip flush
+200 OK
+```
+
+## 2-5. Test connection to the server
+
+* Subcommand `ping` sends ping message to the server.
+
+```
+$ rclip ping
+pong
+$ rclip ping -c # Show client information (IP address and port)
+pong 123.45.67.89 56789
 ```
 
 # 3. Technology
