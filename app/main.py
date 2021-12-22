@@ -12,6 +12,7 @@ redis_host = os.environ.get("REDIS_HOST", "localhost")
 redis_port = os.environ.get("REDIS_PORT", "6379")
 redis_ttl = os.environ.get("REDIS_TTL", "60")
 redis_ttl_file = os.environ.get("REDIS_TTL_FILE", "1800")
+key_width = os.environ.get("KEY_WIDTH", "4")
 
 redis = Redis(host=redis_host, port=redis_port)
 
@@ -50,7 +51,7 @@ async def post_message(message_data: MessageModel):
     key_time = str(time.time())
     key_src = message + ':' + key_time
     key_src_shadow = '*:' + key_time
-    key = hashlib.blake2s(key_src.encode(), digest_size=4).hexdigest()
+    key = hashlib.blake2s(key_src.encode(), digest_size=int(key_width)).hexdigest()
     redis.set(key, message)
     redis.hset(key+'+hash', 'key_src', key_src_shadow)
     redis.hset(key+'+hash', 'category', category)
@@ -84,7 +85,7 @@ async def post_file(file: UploadFile = File(...)):
     size = len(data)
     ttl = redis_ttl_file
     key_src = str(file.filename) + ':' + str(time.time())
-    key = hashlib.blake2s(key_src.encode(), digest_size=4).hexdigest()
+    key = hashlib.blake2s(key_src.encode(), digest_size=int(key_width)).hexdigest()
     redis.set(key, data)
     redis.hset(key+'+hash', 'key_src', key_src)
     redis.hset(key+'+hash', 'category', '__file__')
