@@ -32,17 +32,20 @@ def send(url, message, ttl=None, control_message=False):
     data = {
         'message': message
     }
-    if ttl is not None:
-        data.update({
-            'ttl': ttl
-        })
     if control_message is True:
         data.update({
             'category': rclip_category_file_fragment_list
         })
+
+    headers = {}
+    if ttl is not None:
+        headers.update({
+            'X-ttl': ttl
+        })
+
     res = None
     try:
-        res = requests.post(url, json=data)
+        res = requests.post(url, json=data, headers=headers)
     except Exception as e:
         exception_name = type(e).__name__
         detail = str(e)

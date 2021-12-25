@@ -38,14 +38,14 @@ async def delete_clippboard(request: Request):
             'response': {'result': result}}
 
 @app.post('/api/v1/messages')
-async def post_message(message_data: MessageModel):
+async def post_message(message_data: MessageModel, x_ttl: Optional[int] = Header(None)):
     message = message_data.message
     if message_data.category is not None:
         category = message_data.category
     else:
         category = '__message__'
-    if message_data.ttl is not None:
-        ttl = message_data.ttl
+    if x_ttl is not None:
+        ttl = x_ttl
     else:
         ttl = redis_ttl
     key_time = str(time.time())
