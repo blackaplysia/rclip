@@ -7,3 +7,6 @@ class MessageModel(BaseModel):
     message: str
     category: Optional[str] = None
     ttl: Optional[int] = None
+
+class TTLModel(BaseModel):
+    ttl: int

@@ -6,7 +6,7 @@ import time
 from redis import Redis
 from fastapi import FastAPI, Request, Response, File, UploadFile, HTTPException
 
-from models import MessageModel
+from models import MessageModel, TTLModel
 
 redis_host = os.environ.get("REDIS_HOST", "localhost")
 redis_port = os.environ.get("REDIS_PORT", "6379")
@@ -101,3 +101,24 @@ async def get_file(key: str):
         raise HTTPException(status_code=404)
     data = redis.get(key)
     return Response(content=data, media_type='application/octet-stream')
+
+def set_ttl(key: str, ttl_data: TTLModel, category=None):
+    if redis.exists(key) == 0 or redis.exists(key+'+hash') == 0:
+        raise HTTPException(status_code=404)
+    if category is not None:
+        stored_category = redis.hget(key+'+hash', 'category')
+        if category != stored_category:
+            raise HTTPException(status_code=403)
+    ttl = ttl_data.ttl
+    redis.expire(key, ttl)
+    redis.expire(key+'+hash', ttl)
+    return {'request': {'key': key, 'ttl': ttl},
+            'response': {'key': key, 'ttl': ttl}}
+
+@app.post('/api/v1/messages/{key}/ttl')
+async def set_message_ttl(key: str, ttl_data: TTLModel):
+    return set_ttl(key, ttl_data)
+
+@app.post('/api/v1/files/{key}/ttl')
+async def set_file_ttl(key: str, ttl_data: TTLModel):
+    return set_ttl(key, ttl_data, category='__file__')
