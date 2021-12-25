@@ -9,4 +9,4 @@ class MessageModel(BaseModel):
     ttl: Optional[int] = None
 
 class TTLModel(BaseModel):
-    ttl: int
+    ttl: Optional[int] = None

@@ -16,7 +16,7 @@ rclip_status_file_fragment_list = 278
 
 verbose = False
 
-def send(url, message, ttl, control_message=False):
+def send(url, message, ttl=None, control_message=False):
     out_status = 0
     out_message = None
 
@@ -147,7 +147,7 @@ def delete(url):
 
     return out_status, out_message
 
-def send_file(url, url_keys, filename, ttl, chunk_size = None):
+def send_file(url, url_keys, filename, ttl=None, chunk_size = None):
     out_status = 0
     part_messages = []
 
@@ -173,9 +173,15 @@ def send_file(url, url_keys, filename, ttl, chunk_size = None):
                     'file': (f'{filename}.{file_number}', bd, 'application/octet-stream')
                 }
 
+                headers = {}
+                if ttl is not None:
+                    headers.update({
+                        'X-ttl': ttl
+                    })
+
                 res = None
                 try:
-                    res = requests.post(url, files=files)
+                    res = requests.post(url, files=files, headers=headers)
                 except Exception as e:
                     out_status = errno.EIO
                     exception_name = type(e).__name__

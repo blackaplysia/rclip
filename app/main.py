@@ -4,14 +4,14 @@ import hashlib
 import os
 import time
 from redis import Redis
-from fastapi import FastAPI, Request, Response, File, UploadFile, HTTPException
+from typing import Optional
+from fastapi import FastAPI, Request, Response, File, UploadFile, Header, HTTPException
 
 from models import MessageModel, TTLModel
 
 redis_host = os.environ.get("REDIS_HOST", "localhost")
 redis_port = os.environ.get("REDIS_PORT", "6379")
 redis_ttl = os.environ.get("REDIS_TTL", "60")
-redis_ttl_file = os.environ.get("REDIS_TTL_FILE", "1800")
 key_width = os.environ.get("KEY_WIDTH", "4")
 
 redis = Redis(host=redis_host, port=redis_port)
@@ -80,10 +80,13 @@ async def delete_message(key: str):
             'response': {'key': key}}
 
 @app.post('/api/v1/files')
-async def post_file(file: UploadFile = File(...)):
+async def post_file(file: UploadFile = File(...), x_ttl: Optional[int] = Header(None)):
     data = file.file.read()
     size = len(data)
-    ttl = redis_ttl_file
+    if x_ttl is not None:
+        ttl = x_ttl
+    else:
+        ttl = redis_ttl
     key_src = str(file.filename) + ':' + str(time.time())
     key = hashlib.blake2s(key_src.encode(), digest_size=int(key_width)).hexdigest()
     redis.set(key, data)

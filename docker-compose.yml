@@ -11,7 +11,6 @@ services:
     environment:
     - REDIS_HOST=rclipredis
     - REDIS_TTL=30
-    - REDIS_TTL_FILE=600
     - KEY_WIDTH=3
     ports:
     - '80:80'
