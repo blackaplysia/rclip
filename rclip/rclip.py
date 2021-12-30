@@ -7,6 +7,7 @@ import json
 import os
 import requests
 import sys
+import urllib.parse
 from argparse import RawDescriptionHelpFormatter
 from operator import attrgetter
 from urllib.parse import urljoin
@@ -161,6 +162,9 @@ def send_file(url, url_keys, filename, ttl=None, chunk_size = None):
     else:
         chunk_size = 1000000
 
+    basename = os.path.basename(filename)
+    keys.append(urllib.parse.quote(basename))
+
     try:
         file_size = os.path.getsize(filename)
         with open(filename, 'rb') as fd:
@@ -173,7 +177,7 @@ def send_file(url, url_keys, filename, ttl=None, chunk_size = None):
                 bd = io.BytesIO(data)
 
                 files = {
-                    'file': (f'{filename}.{file_number}', bd, 'application/octet-stream')
+                    'file': (f'{basename}.{file_number}', bd, 'application/octet-stream')
                 }
 
                 headers = {}
@@ -212,92 +216,88 @@ def send_file(url, url_keys, filename, ttl=None, chunk_size = None):
                     key = text['response']['key']
                     keys.append(key)
 
-                if verbose:
-                    print(f'post url: {url}, file: {filename}.{file_number}, length: {sz}', file=sys.stderr)
+                    if verbose:
+                        print(f'post url: {url}, file: {basename}.{file_number}, length: {sz}', file=sys.stderr)
 
                 read_size = read_size + sz
                 file_number = file_number + 1
 
     except Exception as e:
+        out_status = errno.EIO
         exception_name = type(e).__name__
         detail = str(e)
-        part_messages.append(f'#? {exception_name} {detail}')
+        part_messages.append(f'* {exception_name} {detail}')
         out_message = '\n'.join(part_messages)
-        return errno.EIO, out_message
+        return out_status, out_message
 
     key_status, key_message = send(url_keys, ':'.join(keys), ttl, control_message=True)
     if key_status == 0:
         out_message = key_message
     else:
-        part_messages.append(f'#* {key_status} {key_message}')
+        part_messages.append(f'* {key_status} {key_message}')
         out_message = '\n'.join(part_messages)
         out_status = key_status
     return out_status, out_message
 
-def receive_file(url_base, filename, keys_string):
+def receive_file(url_base, filename, keys_string, force=False):
     out_status = 0
     out_message = None
     part_messages = []
 
     keys = keys_string.split(':')
-
-    if filename is None:
-        fd = sys.stdout.buffer
+    original_basename = urllib.parse.unquote(keys[0])
+    keys = keys[1:]
 
     try:
-        if filename is not None:
-            fd = open(filename, 'wb')
+        if filename is None:
+            filename = original_basename
 
-        for key in keys:
-            sz = 0
-            res = None
-            try:
-                url = url_base + key
-                res = requests.get(url)
-            except Exception as e:
-                if fd is not sys.stdout.buffer:
-                    fd.close()
-                out_status = errno.EIO
-                exception_name = type(e).__name__
-                detail = str(e)
-                part_messages.append(f'{key} {exception_name} {detail}')
-                out_message = '\n'.join(part_messages)
-                return out_status, out_message
+        mode = 'wb' if force is True else 'xb'
+        with open(filename, mode) as fd:
 
-            if res is not None:
-                status = res.status_code
-                content_type = res.headers['Content-Type']
-                if content_type != 'application/json':
-                    text = None
-                else:
-                    text = json.loads(res.text)
+            for key in keys:
+                sz = 0
+                res = None
+                try:
+                    url = url_base + key
+                    res = requests.get(url)
+                except Exception as e:
+                    out_status = errno.EIO
+                    exception_name = type(e).__name__
+                    detail = str(e)
+                    part_messages.append(f'{key} {exception_name} {detail}')
+                    out_message = '\n'.join(part_messages)
+                    return out_status, out_message
 
-                if status >= 400:
-                    out_status = errno.ENOENT
-                    if text is not None:
-                        detail = text['detail']
-                        part_messages.append(f'{key} {status} {detail}')
+                if res is not None:
+                    status = res.status_code
+                    content_type = res.headers['Content-Type']
+                    if content_type != 'application/json':
+                        text = None
                     else:
-                        part_messages.append(f'{key} {status} ({content_type})')
-                else:
-                    fd.write(res.content)
-                    sz = len(res.content)
+                        text = json.loads(res.text)
 
-            if verbose:
-                print(f'get url: {url}, length: {sz}', file=sys.stderr)
+                    if status >= 400:
+                        out_status = errno.ENOENT
+                        if text is not None:
+                            detail = text['detail']
+                            part_messages.append(f'{key} {status} {detail}')
+                        else:
+                            part_messages.append(f'{key} {status} ({content_type})')
+                    else:
+                        fd.write(res.content)
+                        sz = len(res.content)
 
-        if fd is not sys.stdout.buffer:
-            fd.close()
-            fd = sys.stdout
+                if verbose:
+                    print(f'get url: {url}, length: {sz}', file=sys.stderr)
 
     except Exception as e:
-        if fd is not sys.stdout.buffer:
-            fd.close()
+        out_status = errno.EIO
         exception_name = type(e).__name__
         detail = str(e)
-        part_messages.append(f'#? {exception_name} {detail}')
+        part_messages.append(f'* {exception_name} {detail}')
         out_message = '\n'.join(part_messages)
-        return errno.EIO, out_message
+        return out_status, out_message
 
     out_message = '\n'.join(part_messages)
 
@@ -408,6 +408,7 @@ You can modify this value with -a or $RCLIP_API.''')
     subparser_receive = subparsers.add_parser('receive', aliases=['r'], help='receive message')
     subparser_receive.add_argument('key', nargs=1, help='message key')
     subparser_receive.add_argument('-o', '--output', nargs=1, help='output file')
+    subparser_receive.add_argument('-F', '--force', action='store_true', help='force to overwrite existing file')
     subparser_delete = subparsers.add_parser('delete', aliases=['d'], help='delete message')
     subparser_delete.add_argument('key', nargs=1, help='message key')
 
@@ -445,7 +446,7 @@ You can modify this value with -a or $RCLIP_API.''')
         out_status, out_message = receive(keys_url)
         if out_status == rclip_status_file_fragment_list:
             base_url = urljoin(api, base_files)
-            out_status, out_message = receive_file(base_url, o, out_message)
+            out_status, out_message = receive_file(base_url, o, out_message, force=args.force)
     elif method == 'delete' or method == 'd':
         url = urljoin(api, base_messages + args.key[0])
         out_status, out_message = delete(url)
