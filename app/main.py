@@ -16,7 +16,7 @@ key_width = os.environ.get("KEY_WIDTH", "4")
 
 redis = Redis(host=redis_host, port=redis_port)
 
-app = FastAPI(redoc_url=None, openapi_url="/api/v1/openapi.json",
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None,
               title="rclip", description="Remote clipboard")
 
 @app.get('/api/v1/clipboard')
