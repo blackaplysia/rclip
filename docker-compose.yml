@@ -8,12 +8,16 @@ services:
     build:
         context: .
         dockerfile: Dockerfile
+        args:
+          - PORT=${PORT}
     environment:
-    - REDIS_HOST=rclipredis
-    - REDIS_TTL=30
-    - KEY_WIDTH=3
+      - REDIS_HOST=rclipredis
+      - REDIS_TTL=${REDIS_TTL:-30}
+      - KEY_WIDTH=${KEY_WIDTH:-3}
+      - PORT=${PORT:-80}
+      - EXPOSED_PORT=${EXPOSED_PORT:-80}
     ports:
-    - '80:80'
+      - '${EXPOSED_PORT}:${PORT}'
     volumes:
       - type: bind
         source: ./logs
