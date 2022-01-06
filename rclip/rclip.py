@@ -33,9 +33,12 @@ def send(url, message, ttl=None, control_message=False):
     data = {
         'message': message
     }
+
+    category = None
     if control_message is True:
+        category = rclip_category_file_fragment_list
         data.update({
-            'category': rclip_category_file_fragment_list
+            'category': category
         })
 
     headers = {}
@@ -72,7 +75,7 @@ def send(url, message, ttl=None, control_message=False):
             out_message = text['response']['key']
 
     if verbose:
-        print(f'post url: {url}, ttl: {ttl}, category: {rclip_category_file_fragment_list}', file=sys.stderr)
+        print(f'post url: {url}, ttl: {ttl}, category: {category}', file=sys.stderr)
 
     return out_status, out_message
 
@@ -424,8 +427,8 @@ You can modify this value with -a or $RCLIP_API.''')
     global verbose
     verbose = args.verbose
 
-    base_messages = 'api/v1/messages/'
-    base_files = 'api/v1/files/'
+    base_messages = 'api/v1/messages'
+    base_files = 'api/v1/files'
     base_clipboard = 'api/v1/clipboard'
     method = args.subparser_name
     out_status = 0
@@ -442,13 +445,13 @@ You can modify this value with -a or $RCLIP_API.''')
             out_status, out_message = send(url, t, ttl)
     elif method == 'receive' or method == 'r':
         o = args.output[0] if args.output else None
-        keys_url = urljoin(api, base_messages + args.key[0])
+        keys_url = urljoin(api, base_messages + '/' + args.key[0])
         out_status, out_message = receive(keys_url)
         if out_status == rclip_status_file_fragment_list:
             base_url = urljoin(api, base_files)
             out_status, out_message = receive_file(base_url, o, out_message, force=args.force)
     elif method == 'delete' or method == 'd':
-        url = urljoin(api, base_messages + args.key[0])
+        url = urljoin(api, base_messages + '/' + args.key[0])
         out_status, out_message = delete(url)
     elif method == 'ping':
         url = urljoin(api, base_clipboard)
