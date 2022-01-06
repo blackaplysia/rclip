@@ -424,9 +424,9 @@ You can modify this value with -a or $RCLIP_API.''')
     global verbose
     verbose = args.verbose
 
-    base_messages = '/api/v1/messages/'
-    base_files = '/api/v1/files/'
-    base_clipboard = '/api/v1/clipboard'
+    base_messages = 'api/v1/messages/'
+    base_files = 'api/v1/files/'
+    base_clipboard = 'api/v1/clipboard'
     method = args.subparser_name
     out_status = 0
     if method == 'send' or method == 's':
