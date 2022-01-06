@@ -262,7 +262,7 @@ def receive_file(url_base, filename, keys_string, force=False):
                 sz = 0
                 res = None
                 try:
-                    url = url_base + key
+                    url = url_base + '/' + key
                     res = requests.get(url)
                 except Exception as e:
                     out_status = errno.EIO
