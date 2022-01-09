@@ -2,6 +2,7 @@
 
 import hashlib
 import os
+import re
 import time
 from redis import Redis
 from typing import Optional
@@ -21,12 +22,17 @@ app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None,
 
 @app.get('/api/v1/clipboard')
 async def ping(request: Request):
+    ip = request.client.host
+    port = request.client.port
+    for header in request.headers.raw:
+        if header[0] == 'x-forwarded-for'.encode('utf-8'):
+            ip = re.split(', ', header[1].decode('utf-8'))[0]
     return {'request': '(ping)',
             'response': {
                 'acq': 'pong',
                 'client': {
-                    'host': request.client.host,
-                    'port': request.client.port
+                    'host': ip,
+                    'port': port
                 }
             }
     }
