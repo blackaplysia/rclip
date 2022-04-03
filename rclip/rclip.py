@@ -98,6 +98,8 @@ def receive(url):
         if content_type != 'application/json':
             text = None
         else:
+            if res.encoding is None:
+                res.encoding = 'utf-8'
             text = json.loads(res.text)
 
         if status >= 400:
@@ -386,6 +388,10 @@ def flush(url):
     return out_status, out_message
 
 def main():
+
+    sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding="utf-8")
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
     class SortingHelpFormatter(RawDescriptionHelpFormatter):
         def add_arguments(self, actions):
