@@ -6,14 +6,16 @@ rclip is a simple message clipboard.
 
 ## 2-1. Send a message or a file
 
-* Subcommand `send` (or `s`) sends a message or a file to the server and print a key which you need when you will receive it.
-* You can give rclip the message by an arguemt, file or stdin.
+* Run command without key to send a message or a file to the server, which prints a key which you need when you will receive it.
+* You can give rclip the message by an arguemt, stdin, external command output, and file.
 
 ```
-$ rclip s -t hello1
+$ rclip -t hello1
 f0ef6a40
 $ echo hello2 | rclip s
 b53dcfa1
+$ rclip --input-from='powershell.exe -command get-clipboard' # paste from Windows clipboard
+e87c6a12
 $ rclip s -f srcfile
 a4d8354c
 $ rclip s -f srcfile -T 6000 # TTL 6000sec
@@ -22,49 +24,50 @@ a4d8354c
 
 ## 2-2. Receive the message
 
-* Subcommand `receive` (or `r`) receives the message related to the given key.
+* Run command with the key to receive the message or the file.
 * Messages has the time-to-live (TTL) defined by the server.  So you cannot receive any messages after the TTL.
 
 ```
-$ rclip r b53dcfa1
+$ rclip b53dcfa1
 hello2
-$ rclip r b53dcfa1 > destfile
-$ rclip r b53dcfa1 -o destfile
+$ rclip a4d8354c # the file 'srcfile' created in the current directory
+$ rclip a4d8354c -F # Force to overwrite the existing file
+$ rclip b53dcfa1 > destfile
+$ rclip b53dcfa1 -o destfile
+$ rclip b53dcfa1 --output-to 'clip.exe' # copy to Windows clipboard
 $ sleep 60
-$ rclip r b53dcfa1
+$ rclip b53dcfa1
 404 Not Found
 ```
 
 ## 2-3. Delete the message
 
-* Subcommand `delete` (or `d`) deletes the message related to the given key.
+* Run command with the key and optional argument `--delete` (or `d`) to delete the message or the file.
 * Usually there is no need to delete messages because they has the TTL.
 
 ```
-$ rclip d b53dcfa1
+$ rclip b53dcfa1 --delete
 200
-$ rclip d b53dcfa1
+$ rclip b53dcfa1 --delete
 404 Not Found
 ```
 
 ## 2-4. Flush all messages
 
-* Subcommand `flush` flushes the message database on the server.
+* Run command with an argument `--flush` flushes the message database on the server.
 * Usually there is no need to flush database because their data has the TTL.
 
 ```
-$ rclip flush
+$ rclip --flush
 200 OK
 ```
 
 ## 2-5. Test connection to the server
 
-* Subcommand `ping` sends ping message to the server.
+* Run command with an argument `--ping` sends ping message to the server.
 
 ```
-$ rclip ping
-pong
-$ rclip ping -c # Show client information (IP address and port)
+$ rclip --ping
 pong 123.45.67.89 56789
 ```
 
