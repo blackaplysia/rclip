@@ -505,6 +505,8 @@ You can modify this value with -a or $RCLIP_API.''')
             file_url = urljoin(api, base_files)
             keys_url = urljoin(api, base_messages)
             out_status, out_message = send_file(file_url, keys_url, f, ttl)
+            out_statuses.append(out_status)
+            out_messages.append(out_message)
         else:
             if t is None:
                 pipe = args.input_from[0] if args.input_from else None
