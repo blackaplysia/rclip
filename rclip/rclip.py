@@ -45,32 +45,34 @@ def read_from_stdin(pipe_input=None):
 
     return message, 0, None
 
-def write_to_stdout(message, pipe_output=None):
+def write_to_stdout(message, method, pipe_output=None, no_r_stdout=False, no_s_pipe=False):
     if message is not None:
 
-        print(message, end='')
+        if method != 'receive' or no_r_stdout != True:
+            print(message, end='')
 
-        if pipe_output is not None:
-            fifo_name = f'named_pipe.{os.path.basename(sys.argv[0])}.{os.getpid()}.{time.time()}'
-            os.mkfifo(fifo_name, mode=0o777)
+        if method != 'send' or no_s_pipe != True:
+            if pipe_output is not None:
+                fifo_name = f'named_pipe.{os.path.basename(sys.argv[0])}.{os.getpid()}.{time.time()}'
+                os.mkfifo(fifo_name, mode=0o777)
 
-            fifo_in = os.open(fifo_name, os.O_RDONLY | os.O_NONBLOCK)
-            proc = subprocess.Popen(pipe_output, shell=True, stdin=fifo_in, stdout=PIPE, stderr=PIPE, text=True)
-            os.close(fifo_in)
+                fifo_in = os.open(fifo_name, os.O_RDONLY | os.O_NONBLOCK)
+                proc = subprocess.Popen(pipe_output, shell=True, stdin=fifo_in, stdout=PIPE, stderr=PIPE, text=True)
+                os.close(fifo_in)
 
-            fifo_out = os.open(fifo_name, os.O_WRONLY)
-            os.write(fifo_out, bytes(message, 'utf-8'))
-            os.close(fifo_out)
+                fifo_out = os.open(fifo_name, os.O_WRONLY)
+                os.write(fifo_out, bytes(message, 'utf-8'))
+                os.close(fifo_out)
 
-            out, err = proc.communicate()
-            if proc.returncode > 0:
-                if verbose:
-                    coding_err = chardet.detect(err)['encoding']
-                    if coding_err == None:
-                        coding_err = 'utf-8'
-                    print(f'pipe: {err.decode(coding_err)}', file=sys.stderr)
+                out, err = proc.communicate()
+                if proc.returncode > 0:
+                    if verbose:
+                        coding_err = chardet.detect(err)['encoding']
+                        if coding_err == None:
+                            coding_err = 'utf-8'
+                        print(f'pipe: {err.decode(coding_err)}', file=sys.stderr)
 
-            os.unlink(fifo_name)
+                os.unlink(fifo_name)
 
 def send(url, message, ttl=None, control_message=False):
     out_status = 0
@@ -456,6 +458,8 @@ You can modify this value with -a or $RCLIP_API.''')
     parser.add_argument('--api', nargs=1, help='message api url')
     parser.add_argument('--input-from', nargs=1, metavar='COMMAND', help='pipe input from command')
     parser.add_argument('--output-to', nargs=1, metavar='COMMAND', help='pipe output to command')
+    parser.add_argument('--no-receive-stdout', action='store_true', help='no standard output when to receive message')
+    parser.add_argument('--no-send-pipe', action='store_true', help='no pipe output when to send message')
     parser.add_argument('-v', '--verbose', action='store_true', help='verbose mode')
     parser.add_argument('-T', '--ttl', nargs=1, help='time to live')
     parser.add_argument('-F', '--force', action='store_true', help='force to overwrite existing file')
@@ -480,6 +484,7 @@ You can modify this value with -a or $RCLIP_API.''')
     base_files = 'api/v1/files'
     base_clipboard = 'api/v1/clipboard'
 
+    method = None
     out_statuses = []
     out_messages = []
     if args.ping is True:
@@ -498,6 +503,8 @@ You can modify this value with -a or $RCLIP_API.''')
         out_statuses.append(out_status)
         out_messages.append(out_message)
     elif args.key is None:
+        method='send'
+
         f = args.file[0] if args.file else None
         t = args.text[0] if args.text else None
         ttl = args.ttl[0] if args.ttl else None
@@ -520,6 +527,8 @@ You can modify this value with -a or $RCLIP_API.''')
                 out_statuses.append(out_status)
                 out_messages.append(out_message)
     else:
+        method='receive'
+
         o = args.output[0] if args.output else None
         keys_url = urljoin(api, base_messages + '/' + args.key)
         out_status, out_message = receive(keys_url)
@@ -537,7 +546,7 @@ You can modify this value with -a or $RCLIP_API.''')
                 exit_status = s
         else:
             pipe = args.output_to[0] if args.output_to else None
-            write_to_stdout(m, pipe)
+            write_to_stdout(m, method, pipe, no_r_stdout=args.no_receive_stdout, no_s_pipe=args.no_send_pipe)
 
     return exit_status
 
