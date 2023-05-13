@@ -21,7 +21,7 @@ rclip_status_file_fragment_list = 278
 
 verbose = False
 
-def read_from_stdin(pipe_input=None):
+def read_from_stdin(pipe_input=None, pipe_encoding=None):
     if pipe_input is None:
         try:
             message = sys.stdin.read()
@@ -38,14 +38,17 @@ def read_from_stdin(pipe_input=None):
             if coding_err == None:
                 coding_err = 'utf-8'
             return None, proc.returncode, err.decode(coding_err)
-        coding = chardet.detect(out)['encoding']
-        if coding == None:
-            coding = 'utf-8'
+        if pipe_encoding:
+            coding = pipe_encoding
+        else:
+            coding = chardet.detect(out)['encoding']
+            if coding == None:
+                coding = 'utf-8'
         message = out.decode(coding)
 
     return message, 0, None
 
-def write_to_stdout(message, method, pipe_output=None, no_r_stdout=False, no_s_pipe=False):
+def write_to_stdout(message, method, pipe_output=None, pipe_encoding=None, no_r_stdout=False, no_s_pipe=False):
     if message is not None:
 
         if method != 'receive' or no_r_stdout != True:
@@ -60,8 +63,13 @@ def write_to_stdout(message, method, pipe_output=None, no_r_stdout=False, no_s_p
                 proc = subprocess.Popen(pipe_output, shell=True, stdin=fifo_in, stdout=PIPE, stderr=PIPE, text=True)
                 os.close(fifo_in)
 
+                if pipe_encoding:
+                    coding = pipe_encoding
+                else:
+                    coding = 'utf-8'
+
                 fifo_out = os.open(fifo_name, os.O_WRONLY)
-                os.write(fifo_out, bytes(message, 'utf-8'))
+                os.write(fifo_out, bytes(message, coding))
                 os.close(fifo_out)
 
                 out, err = proc.communicate()
@@ -457,7 +465,9 @@ def main():
 You can modify this value with -a or $RCLIP_API.''')
     parser.add_argument('--api', nargs=1, help='message api url')
     parser.add_argument('--input-from', nargs=1, metavar='COMMAND', help='pipe input from command')
+    parser.add_argument('--input-encoding', nargs=1, metavar='CODING', help='encoding of pipe input')
     parser.add_argument('--output-to', nargs=1, metavar='COMMAND', help='pipe output to command')
+    parser.add_argument('--output-encoding', nargs=1, metavar='CODING', help='encoding of pipe input')
     parser.add_argument('--no-receive-stdout', action='store_true', help='no standard output when to receive message')
     parser.add_argument('--no-send-pipe', action='store_true', help='no pipe output when to send message')
     parser.add_argument('-v', '--verbose', action='store_true', help='verbose mode')
@@ -517,7 +527,8 @@ You can modify this value with -a or $RCLIP_API.''')
         else:
             if t is None:
                 pipe = args.input_from[0] if args.input_from else None
-                t, out_status, out_message = read_from_stdin(pipe)
+                pipe_encoding = args.input_encoding[0] if args.input_encoding else None
+                t, out_status, out_message = read_from_stdin(pipe, pipe_encoding)
                 if t is None:
                     out_statuses.append(out_status)
                     out_messages.append(out_message)
@@ -546,7 +557,8 @@ You can modify this value with -a or $RCLIP_API.''')
                 exit_status = s
         else:
             pipe = args.output_to[0] if args.output_to else None
-            write_to_stdout(m, method, pipe, no_r_stdout=args.no_receive_stdout, no_s_pipe=args.no_send_pipe)
+            pipe_encoding = args.output_encoding[0] if args.output_encoding else None
+            write_to_stdout(m, method, pipe, pipe_encoding, no_r_stdout=args.no_receive_stdout, no_s_pipe=args.no_send_pipe)
 
     return exit_status
 
