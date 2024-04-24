@@ -271,7 +271,7 @@ def send_file(url, url_keys, filename, ttl=None, chunk_size = None):
                         text = json.loads(res.text)
 
                 if status >= 400:
-                    out_status = errno.NOENT
+                    out_status = errno.ENOENT
                     if text is not None:
                         detail = text['detail']
                         part_messages.append(f'#{file_number} {status} {detail}')
