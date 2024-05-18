@@ -1,10 +1,11 @@
-version: '3'
 services:
   rclipredis:
     image: redis:latest
     container_name: rclipredis
+    restart: always
   rclipapi:
     container_name: rclipapi
+    restart: always
     build:
         context: .
         dockerfile: Dockerfile
